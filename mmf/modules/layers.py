@@ -8,6 +8,9 @@ from mmf.modules.decoders import LanguageDecoder
 from torch import nn
 from torch.nn.utils.weight_norm import weight_norm
 
+from torch.nn import Sequential as Seq, Linear as Lin, ReLU
+from torch_scatter import scatter_mean
+from torch_geometric.nn import MetaLayer
 
 class ConvNet(nn.Module):
     def __init__(
@@ -756,3 +759,70 @@ class AttnPool1d(nn.Module):
         self.p_attn = nn.functional.softmax(score, dim=-1)
 
         return torch.matmul(self.p_attn, value).view(b, self.num_attn, -1)
+
+
+# TODO 
+
+class EdgeModel(nn.Module):
+    def __init__(self):
+        super(EdgeModel, self).__init__()
+        self.edge_mlp = Seq(Lin(..., ...), ReLU(), Lin(..., ...))
+
+    def forward(self, src, dest, edge_attr, u, batch):
+        # source, target: [E, F_x], where E is the number of edges.
+        # edge_attr: [E, F_e]
+        # u: [B, F_u], where B is the number of graphs.
+        # batch: [E] with max entry B - 1.
+        out = torch.cat([src, dest, edge_attr, u[batch]], 1)
+        return self.edge_mlp(out)
+
+class NodeModel(nn.Module):
+    def __init__(self):
+        super(NodeModel, self).__init__()
+        self.node_mlp_1 = Seq(Lin(..., ...), ReLU(), Lin(..., ...))
+        self.node_mlp_2 = Seq(Lin(..., ...), ReLU(), Lin(..., ...))
+
+    def forward(self, x, edge_index, edge_attr, u, batch):
+        # x: [N, F_x], where N is the number of nodes.
+        # edge_index: [2, E] with max entry N - 1.
+        # edge_attr: [E, F_e]
+        # u: [B, F_u]
+        # batch: [N] with max entry B - 1.
+        row, col = edge_index
+        out = torch.cat([x[row], edge_attr], dim=1)
+        out = self.node_mlp_1(out)
+        out = scatter_mean(out, col, dim=0, dim_size=x.size(0))
+        out = torch.cat([x, out, u[batch]], dim=1)
+        return self.node_mlp_2(out)
+
+class GlobalModel(nn.Module):
+    def __init__(self):
+        super(GlobalModel, self).__init__()
+        self.global_mlp = Seq(Lin(..., ...), ReLU(), Lin(..., ...))
+
+    def forward(self, x, edge_index, edge_attr, u, batch):
+        # x: [N, F_x], where N is the number of nodes.
+        # edge_index: [2, E] with max entry N - 1.
+        # edge_attr: [E, F_e]
+        # u: [B, F_u]
+        # batch: [N] with max entry B - 1.
+        out = torch.cat([u, scatter_mean(x, batch, dim=0)], dim=1)
+        return self.global_mlp(out)
+
+
+class GMN(nn.Module):
+    """
+    metalayer
+    https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#torch_geometric.nn.meta.MetaLayer
+    """
+
+    def __init__(self, edge_model=None, node_model=None, global_model=None):
+        super().__init__()
+        self.linears = nn.ModuleList([nn.Linear(in_dim, out_dim) for _ in range(3)])
+
+    def forward(self, joint_embedding: torch.Tensor) -> torch.Tensor:
+        if self.training:
+            feat = [self.linears[i](joint_embedding[:, i]) for i in range(3)]
+            return torch.stack(feat, dim=1)
+
+        return self.linears[0](joint_embedding)
