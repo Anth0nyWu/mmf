@@ -55,5 +55,4 @@ model_config:
         padding: 0
         model_data_dir: ${model_config.pythia.model_data_dir}
   
-  pythia_image_only: *pythia
-  pythia_question_only: *pythia
+
