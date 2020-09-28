@@ -1,14 +1,17 @@
 model_config:
   memo_net: &memo_net
+    
     model_data_dir: ${env.data_dir}
-    # model_data_dir: /media/ubuntu/MyDisk/data_mmf/data/datasets
+    
     losses:
     - type: logit_bce
+
     classifier:
       type: logit
       params:
         img_hidden_dim: 5000
         text_hidden_dim: 300
+
     image_feature_embeddings:
     - modal_combine:
         type: non_linear_element_multiply
@@ -20,7 +23,9 @@ model_config:
         type: linear
         params:
           out_dim: 1
+    
     image_feature_dim: 2048
+    
     image_feature_encodings:
     - type: finetune_faster_rcnn_fpn_fc7
       params:
@@ -30,11 +35,13 @@ model_config:
     - type: default
       params:
         model_data_dir: ${model_config.pythia.model_data_dir}
+    
     image_text_modal_combine:
       type: non_linear_element_multiply
       params:
         dropout: 0
         hidden_dim: 5000
+
     text_embeddings:
     - type: attention
       params:
@@ -47,5 +54,5 @@ model_config:
         kernel_size: 1
         padding: 0
         model_data_dir: ${model_config.pythia.model_data_dir}
-  pythia_image_only: *pythia
-  pythia_question_only: *pythia
+  
+

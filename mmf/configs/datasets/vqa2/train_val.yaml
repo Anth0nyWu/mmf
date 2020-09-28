@@ -18,7 +18,8 @@ dataset_config:
       - vqa2/defaults/annotations/imdb_val2014.npy
       val:
       - vqa2/defaults/annotations/imdb_minival2014.npy
-    data_dir: ${env.data_dir}/datasets
+    # data_dir: ${env.data_dir}/datasets
+    data_dir: /media/ubuntu/MyDisk/data_mmf/datasets
     depth_first: false
     fast_read: false
     max_features: 100

@@ -24,25 +24,25 @@ from torch import nn
 class Memo_net(Pythia):
     def __init__(self, config):
         super().__init__(config)
-        self.config = config
-        self._global_config = registry.get("config")
-        self._datasets = self._global_config.datasets.split(",")
+
 
     @classmethod
     def config_path(cls):
         return "configs/models/memo_net/defaults.yaml"
 
+    '''
     @classmethod
     def format_state_key(cls, key):
         return key.replace("fa_history", "fa_context")
-
+    '''
+    
     def build(self):
         self._build_word_embedding()
         self._init_text_embeddings("text") # question
-        self._init_feature_encoders("image")
-        self._init_feature_embeddings("image")
-        self._init_feature_encoders("caption")
-        self._init_feature_embeddings("caption")
+        self._init_feature_encoders("image") #image
+        self._init_feature_embeddings("image") #image
+        self._init_feature_encoders("caption") #caption
+        self._init_feature_embeddings("caption") #caption
 
         self._init_visualGN_embedding()
         self._init_textualGN_embedding()
@@ -51,7 +51,7 @@ class Memo_net(Pythia):
        # self._init_combine_layer("image", "text")
         self._init_classifier(self._get_classifier_input_dim())
         self._init_extras()
-
+    '''
     def _build_word_embedding(self):
         assert len(self._datasets) > 0
         text_processor = registry.get(self._datasets[0] + "_text_processor")
@@ -81,10 +81,37 @@ class Memo_net(Pythia):
         setattr(self, attr + "_out_dim", embeddings_out_dim)
         setattr(self, attr, nn.ModuleList(text_embeddings))
 
+    def process_text_embedding(
+        self, sample_list, embedding_attr="text_embeddings", info=None
+    ):
+        text_embeddings = []
+
+        # Get "text" attribute in case of "text_embeddings" case
+        # and "context" attribute in case of "context_embeddings"
+        texts = getattr(sample_list, embedding_attr.split("_")[0])
+
+        # Get embedding models
+        text_embedding_models = getattr(self, embedding_attr)
+
+        for text_embedding_model in text_embedding_models:
+            # TODO: Move this logic inside
+            if isinstance(text_embedding_model, PreExtractedEmbedding):
+                embedding = text_embedding_model(sample_list.question_id)
+            else:
+                embedding = text_embedding_model(texts)
+            text_embeddings.append(embedding)
+
+        text_embeddding_total = torch.cat(text_embeddings, dim=1)
+
+        return text_embeddding_total
+
     def _update_text_embedding_args(self, args):
         # Add model_data_dir to kwargs
         args.model_data_dir = self.config.model_data_dir
+    '''
 
+    # 2048D  feat with faster RCNN + ResNet 101
+    '''
     def _init_feature_encoders(self, attr):
         feat_encoders = []
         feat_encoders_list_config = self.config[attr + "_feature_encodings"]
@@ -104,7 +131,8 @@ class Memo_net(Pythia):
             setattr(self, attr + "_feature_dim", feat_model.out_dim)
 
         setattr(self, attr + "_feature_encoders", nn.ModuleList(feat_encoders))
-
+    '''
+    # attention layer combine question & image feat
     def _init_feature_embeddings(self, attr):
         feature_embeddings_list = []
         num_feature_feat = len(getattr(self.config, f"{attr}_feature_encodings"))
@@ -116,6 +144,7 @@ class Memo_net(Pythia):
             feature_attn_model_list = self.config[attr + "_feature_embeddings"]
 
             for feature_attn_model_params in feature_attn_model_list:
+                # img_dim, ques_dim, **kwargs
                 feature_embedding = ImageFeatureEmbedding(
                     getattr(self, attr + "_feature_dim"),
                     self.text_embeddings_out_dim,
@@ -290,6 +319,65 @@ class Memo_net(Pythia):
         feature_embedding_total = torch.cat(feature_embeddings, dim=1)
         return feature_embedding_total, feature_attentions
 
+
+    def _get_embeddings_attr(self, attr):
+        embedding_attr1 = attr
+        if hasattr(self, attr + "_embeddings_out_dim"):
+            embedding_attr1 = attr + "_embeddings_out_dim"
+        else:
+            embedding_attr1 = attr + "_feature_embeddings_out_dim"
+
+        return embedding_attr1
+
+    def _init_combine_layer(self, attr1, attr2):
+        config_attr = attr1 + "_" + attr2 + "_modal_combine"
+
+        multi_modal_combine_layer = ModalCombineLayer(
+            self.config[config_attr].type,
+            getattr(self, self._get_embeddings_attr(attr1)),
+            getattr(self, self._get_embeddings_attr(attr2)),
+            **self.config[config_attr].params,
+        )
+
+        setattr(
+            self,
+            attr1 + "_" + attr2 + "_multi_modal_combine_layer",
+            multi_modal_combine_layer,
+        )
+
+    def _init_classifier(self, combined_embedding_dim):
+        # TODO: Later support multihead
+        num_choices = registry.get(self._datasets[0] + "_num_final_outputs")
+
+        self.classifier = ClassifierLayer(
+            self.config.classifier.type,
+            in_dim=combined_embedding_dim,
+            out_dim=num_choices,
+            **self.config.classifier.params,
+        )
+
+    def _init_extras(self):
+        self.inter_model = None
+
+    def get_optimizer_parameters(self, config):
+        combine_layer = self.image_text_multi_modal_combine_layer
+        params = [
+            {"params": self.word_embedding.parameters()},
+            {"params": self.image_feature_embeddings_list.parameters()},
+            {"params": self.text_embeddings.parameters()},
+            {"params": combine_layer.parameters()},
+            {"params": self.classifier.parameters()},
+            {
+                "params": self.image_feature_encoders.parameters(),
+                "lr": (config.optimizer.params.lr * 0.1),
+            },
+        ]
+
+        return params
+
+    def _get_classifier_input_dim(self):
+        return self.image_text_multi_modal_combine_layer.out_dim
+
     def combine_embeddings(self, *args):
         feature_names = args[0]
         feature_embeddings = args[1]
@@ -300,7 +388,7 @@ class Memo_net(Pythia):
     def calculate_logits(self, joint_embedding, **kwargs):
         return self.classifier(joint_embedding)
 
- '''
+    '''
      TODO 
     def _init_RGC_embedding():
 
@@ -318,7 +406,7 @@ class Memo_net(Pythia):
 
     def process_textualGN_embedding():
 
-'''
+   '''
     
     def forward(self, sample_list):
         '''

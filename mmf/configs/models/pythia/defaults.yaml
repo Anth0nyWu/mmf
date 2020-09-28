@@ -1,6 +1,7 @@
 model_config:
   pythia: &pythia
     model_data_dir: ${env.data_dir}
+    # model_data_dir: /media/ubuntu/MyDisk/data_mmf/data/datasets
     losses:
     - type: logit_bce
     classifier:

@@ -1,6 +1,7 @@
 dataset_config:
   masked_vqa2:
-    data_dir: ${env.data_dir}/datasets
+    #data_dir: ${env.data_dir}/datasets
+    data_dir: /media/ubuntu/MyDisk/data_mmf/datasets
     depth_first: false
     fast_read: false
     use_images: false

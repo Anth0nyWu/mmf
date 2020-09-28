@@ -37,7 +37,10 @@ class VisualGenomeDataset(VQA2Dataset):
         if build_scene_graph_db:
             scene_graph_file = config.scene_graph_files[dataset_type][imdb_file_index]
             scene_graph_file = self._get_absolute_path(scene_graph_file)
+           # scene_graph_file = get_absolute_path(get_ mmf_env("data_dir")+scene_graph_file)
+
             self.scene_graph_db = SceneGraphDatabase(config, scene_graph_file)
+            
 
     def load_item(self, idx):
         sample_info = self.annotation_db[idx]
