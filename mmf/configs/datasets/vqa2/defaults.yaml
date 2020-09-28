@@ -1,6 +1,7 @@
 dataset_config:
   vqa2:
       data_dir: ${env.data_dir}/datasets
+      # data_dir: /media/ubuntu/MyDisk/data_mmf/data/datasets
       depth_first: false
       fast_read: false
       use_images: false
