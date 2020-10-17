@@ -1,46 +1,6 @@
 model_config:
   memo_net: &memo_net
-    
     model_data_dir: ${env.data_dir}
-    
-    losses:
-    - type: logit_bce
-
-    classifier:
-      type: logit
-      params:
-        img_hidden_dim: 5000
-        text_hidden_dim: 300
-
-    image_feature_embeddings:
-    - modal_combine:
-        type: non_linear_element_multiply
-        params:
-          dropout: 0
-          hidden_dim: 5000
-      normalization: softmax
-      transform:
-        type: linear
-        params:
-          out_dim: 1
-    
-    image_feature_dim: 2048
-    
-    image_feature_encodings:
-    - type: finetune_faster_rcnn_fpn_fc7
-      params:
-        bias_file: models/detectron.defaults/fc7_b.pkl
-        weights_file: models/detectron.defaults/fc7_w.pkl
-        model_data_dir: ${model_config.pythia.model_data_dir}
-    - type: default
-      params:
-        model_data_dir: ${model_config.pythia.model_data_dir}
-    
-    image_text_modal_combine:
-      type: non_linear_element_multiply
-      params:
-        dropout: 0
-        hidden_dim: 5000
 
     text_embeddings:
     - type: attention
@@ -53,6 +13,56 @@ model_config:
         embedding_dim: 300
         kernel_size: 1
         padding: 0
-        model_data_dir: ${model_config.pythia.model_data_dir}
-  
+        model_data_dir: ${model_config.memo_net.model_data_dir}
+    # - type: bilstm   
+    #   params: 
+    #     hidden_dim: 1280
+    #     # vocab_size: 1280
+    #     embedding_dim: 300
+    #     # num_layers: 1
+    #     # dropout: 0.0
+    #     # bidirectional: False
+    #     # rnn_type: 'GRU'
+    #     model_data_dir: ${model_config.memo_net.model_data_dir}
+    image_feature_embeddings:
+    - modal_combine:
+        type: non_linear_element_multiply
+        params:
+          dropout: 0
+          hidden_dim: 5000
+      normalization: softmax
+      transform:
+        type: linear
+        params:
+          out_dim: 1
+    image_feature_dim: 2048
 
+    image_feature_encodings:
+    - type: finetune_faster_rcnn_fpn_fc7
+      params:
+        bias_file: models/detectron.defaults/fc7_b.pkl
+        weights_file: models/detectron.defaults/fc7_w.pkl
+        model_data_dir: ${model_config.memo_net.model_data_dir}
+    - type: default
+      params:
+        model_data_dir: ${model_config.memo_net.model_data_dir}
+
+    losses:
+    - type: logit_bce
+    
+    classifier:
+      type: logit
+      params:
+        img_hidden_dim: 5000
+        text_hidden_dim: 300
+
+    image_text_modal_combine:
+      type: non_linear_element_multiply
+      params:
+        dropout: 0
+        hidden_dim: 5000
+
+    mem_nn:
+      max_story_len: 1
+      embd_size: 30
+      vocab_size: 3129

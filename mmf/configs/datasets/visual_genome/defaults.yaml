@@ -26,6 +26,13 @@ dataset_config:
           - imdb/visual_genome/vg_scene_graphs_placeholder.jsonl
           test:
           - imdb/visual_genome/vg_scene_graphs_placeholder.jsonl
+      region_descriptions:
+          train:
+          - imdb/visual_genome/vg_region_descriptions.json
+          val:
+          - imdb/visual_genome/vg_region_descriptions_placeholder.jsonl
+          test:
+          - imdb/visual_genome/vg_region_descriptions_placeholder.jsonl
       max_features: 100
       processors:
         text_processor:

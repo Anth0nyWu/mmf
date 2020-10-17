@@ -305,6 +305,8 @@ class Pythia(BaseModel):
 
         model_output = {"scores": self.calculate_logits(joint_embedding)}
 
+        # print(model_output)
+        # print(model_output['scores'].size())
         return model_output
 
 
