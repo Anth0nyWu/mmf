@@ -8,10 +8,13 @@ dataset_config:
       features:
           train:
           - visual_genome/detectron_fix_100/fc6/,visual_genome/resnet152/
+          # - visual_genome/resnet152/
           val:
           - visual_genome/detectron_fix_100/fc6/,visual_genome/resnet152/
+          # - visual_genome/resnet152/
           test:
           - visual_genome/detectron_fix_100/fc6/,visual_genome/resnet152/
+          # - visual_genome/resnet152/
       annotations:
           train:
           - imdb/visual_genome/vg_question_answers.jsonl
@@ -38,7 +41,7 @@ dataset_config:
         text_processor:
           type: vocab
           params:
-            max_length: 14
+            max_length: 20
             vocab:
               type: intersected
               embedding_name: glove.6B.300d

@@ -248,34 +248,53 @@ class Pythia(BaseModel):
             # Get info related to the current feature. info is generally
             # in key of format "image_info_0" for 0th feature
             feature_info = getattr(sample_list, f"{attr}_info_{i:d}", {})
+            print("feature_i: ", i, feature.size())
+            # print("feature_info", feature_info)
+            
             # For Pythia, we need max_features to mask attention
             feature_dim = getattr(feature_info, "max_features", None)
             if feature_dim is not None:
                 feature_dim = feature_dim[:batch_size_t]
+
+            # print("feat_dim", feature_dim)  # none
 
             # Attribute in which encoders are saved, for "image" it
             # will be "image_feature_encoders", other example is
             # "context_feature_encoders"
             encoders_attr = attr + "_feature_encoders"
             feature_encoder = getattr(self, encoders_attr)[i]
-
             # Encode the features
             encoded_feature = feature_encoder(feature)
 
+            print("encoded_feat:", encoded_feature.size()) # torch.Size([64, 100, 2048])
+            print("=====feat_embedding===== ")
+
             # Get all of the feature embeddings
             list_attr = attr + "_feature_embeddings_list"
-            feature_embedding_models = getattr(self, list_attr)[i]
+            feature_embedding_models = getattr(self, list_attr)[i]  # image_feature_embeddings_list
 
             # Forward through these embeddings one by one
             for feature_embedding_model in feature_embedding_models:
                 inp = (encoded_feature, text_embedding_total, feature_dim, extra)
+                # torch.Size([64, 100, 2048]), [64,2048], none, samplelist()
+                print(feature_embedding_model)
+                print(encoded_feature.size())
+                print(text_embedding_total.size())
 
                 embedding, attention = feature_embedding_model(*inp)
                 feature_embeddings.append(embedding)
                 feature_attentions.append(attention.squeeze(-1))
 
+                print("feature_embeddings_&_attns")
+                print(embedding.size())  # torch.Size([64, 2048])
+                print(attention.size()) # torch.Size([64, 196, 1])
+
         # Concatenate all features embeddings and return along with attention
         feature_embedding_total = torch.cat(feature_embeddings, dim=1)
+
+        # print("feature_embeddings_tot")
+        # print(feature_embedding_total.size())
+
         return feature_embedding_total, feature_attentions
 
     def combine_embeddings(self, *args):
@@ -299,14 +318,19 @@ class Pythia(BaseModel):
         if self.inter_model is not None:
             image_embedding_total = self.inter_model(image_embedding_total)
 
+        print("image_embedding", image_embedding_total.size())  # [batch*4096]
+        print("text_embedding:" , image_embedding_total.size())  # [batch*4096]
+        print("=====combine layer=====")
+
         joint_embedding = self.combine_embeddings(
             ["image", "text"], [image_embedding_total, text_embedding_total]
         )
 
+        print("joint_embedding:", joint_embedding.size()) # [batch*5000]
+
         model_output = {"scores": self.calculate_logits(joint_embedding)}
 
-        # print(model_output)
-        # print(model_output['scores'].size())
+        print("model_output:", model_output['scores'].size()) # [64, 3129]
         return model_output
 
 

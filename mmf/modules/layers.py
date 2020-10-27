@@ -257,6 +257,11 @@ class ModalCombineLayer(nn.Module):
             self.module = TwoLayerElementMultiply(img_feat_dim, txt_emb_dim, **kwargs)
         elif combine_type == "top_down_attention_lstm":
             self.module = TopDownAttentionLSTM(img_feat_dim, txt_emb_dim, **kwargs)
+        elif combine_type == "mem_nn":
+            # print (img_feat_dim, txt_emb_dim, kwargs)
+            # (2048, 2048, params{'dropout': 0, 'hidden_dim': 5000})
+            # self, vocab_size, embd_size, ans_size, max_story_len, hops=3, dropout=0.2, te=True, pe=True
+            self.module = MemNNLayer(**kwargs)
         else:
             raise NotImplementedError("Not implemented combine type: %s" % combine_type)
 
@@ -372,6 +377,11 @@ class MFH(nn.Module):
 class NonLinearElementMultiply(nn.Module):
     def __init__(self, image_feat_dim, ques_emb_dim, **kwargs):
         super().__init__()
+
+        # print("img_feat_dim", image_feat_dim)
+        # print("que_emb_dim", image_feat_dim)
+        # print ("kwargs", kwargs)
+
         self.fa_image = ReLUWithWeightNormFC(image_feat_dim, kwargs["hidden_dim"])
         self.fa_txt = ReLUWithWeightNormFC(ques_emb_dim, kwargs["hidden_dim"])
 
@@ -385,6 +395,11 @@ class NonLinearElementMultiply(nn.Module):
     def forward(self, image_feat, question_embedding, context_embedding=None):
         image_fa = self.fa_image(image_feat)
         question_fa = self.fa_txt(question_embedding)
+
+        # print("image_fa:")
+        # print(image_fa.size())
+        # print("question_fa:")
+        # print(question_fa.size())
 
         if len(image_feat.size()) == 3 and len(question_fa.size()) != 3:
             question_fa_expand = question_fa.unsqueeze(1)
@@ -400,6 +415,9 @@ class NonLinearElementMultiply(nn.Module):
             joint_feature = torch.cat([joint_feature, context_text_joint_feaure], dim=1)
 
         joint_feature = self.dropout(joint_feature)
+
+        # print("joint_feature in layer:")
+        # print(joint_feature.size())
 
         return joint_feature
 
@@ -835,7 +853,8 @@ class GMN(nn.Module):
 
 
 class MemNNLayer(nn.Module):
-    def __init__(self, vocab_size, embd_size, ans_size, max_story_len, hops=3, dropout=0.2, te=True, pe=True):
+    # self, image_feat_dim, ques_emb_dim, **kwargs
+    def __init__(self, vocab_size, embd_size, ans_size, max_story_len, hops=3, dropout=0.05, te=False, pe=False):
         super(MemNNLayer, self).__init__()
         self.hops = hops
         self.embd_size = embd_size
@@ -843,8 +862,8 @@ class MemNNLayer(nn.Module):
         self.position_encoding = pe
 
         init_rng = 0.1
-        self.dropout = nn.Dropout(p=dropout)
-        self.A = nn.ModuleList([nn.Embedding(vocab_size, embd_size) for _ in range(hops+1)])
+        self.dropout = nn.Dropout(p=dropout, inplace=True)
+        self.A = nn.ModuleList([nn.Embedding(vocab_size, embd_size) for _ in range(hops+1)])  #[d*n]
         for i in range(len(self.A)):
             self.A[i].weight.data.normal_(0, init_rng)
             self.A[i].weight.data[0] = 0 # for padding index
@@ -855,8 +874,11 @@ class MemNNLayer(nn.Module):
             self.TA = nn.Parameter(torch.Tensor(1, max_story_len, embd_size).normal_(0, 0.1))
             self.TC = nn.Parameter(torch.Tensor(1, max_story_len, embd_size).normal_(0, 0.1))
 
+        self.out_dim = ans_size
+
     def forward(self, x, q):
-        # x (bs, story_len, s_sent_len) (sentence length)
+        # print("===MN===")
+        # x (bs, story_len, s_sent_len) (batch_size, story_len, sentence length)
         # q (bs, q_sent_len)
 
         # print("x:",x)
@@ -883,7 +905,7 @@ class MemNNLayer(nn.Module):
             pe = pe.unsqueeze(0).unsqueeze(0) # (1, 1, s_sent_len, embd_size)
             pe = pe.repeat(bs, story_len, 1, 1) # (bs, story_len, s_sent_len, embd_size)
 
-        x = x.view(bs*story_len, -1) # (bs*s_sent_len, s_sent_len)
+        x = x.view(bs*story_len, -1) # (bs*story_len, s_sent_len)
 
         q=q.long()
         u = self.dropout(self.B(q)) # (bs, q_sent_len, embd_size)
@@ -913,6 +935,14 @@ class MemNNLayer(nn.Module):
 
         W = torch.t(self.A[-1].weight) # (embd_size, vocab_size)
         out = torch.bmm(u.unsqueeze(1), W.unsqueeze(0).repeat(bs, 1, 1)).squeeze() # (bs, ans_size)
+        # self.out_dim = out.size()
+        # print("out_dim")
+        # print (self.out_dim)
+        # print("out")
+        # print(out.size())
+        # print("softmax")
+        # print(F.log_softmax(out, -1).size())
 
-        return F.log_softmax(out, -1)
+        return out
+        # return F.log_softmax(out, -1)
 

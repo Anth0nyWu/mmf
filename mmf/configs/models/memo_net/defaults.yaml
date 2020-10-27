@@ -14,22 +14,14 @@ model_config:
         kernel_size: 1
         padding: 0
         model_data_dir: ${model_config.memo_net.model_data_dir}
-    # - type: bilstm   
-    #   params: 
-    #     hidden_dim: 1280
-    #     # vocab_size: 1280
-    #     embedding_dim: 300
-    #     # num_layers: 1
-    #     # dropout: 0.0
-    #     # bidirectional: False
-    #     # rnn_type: 'GRU'
-    #     model_data_dir: ${model_config.memo_net.model_data_dir}
+    
     image_feature_embeddings:
     - modal_combine:
         type: non_linear_element_multiply
         params:
           dropout: 0
           hidden_dim: 5000
+
       normalization: softmax
       transform:
         type: linear
@@ -63,6 +55,7 @@ model_config:
         hidden_dim: 5000
 
     mem_nn:
-      max_story_len: 1
+      max_story_len: 196
       embd_size: 30
-      vocab_size: 3129
+      vocab_size: 2048 # fix 2048
+      ans_size: 300

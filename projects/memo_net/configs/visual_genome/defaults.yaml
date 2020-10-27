@@ -11,7 +11,7 @@ optimizer:
   type: Adamax
   params:
     eps: 1.0e-08
-    lr: 0.01
+    lr: 0.01 # 0.01
     weight_decay: 0
 
 evaluation:
@@ -33,7 +33,7 @@ training:
   use_warmup: true
   warmup_factor: 0.2
   warmup_iterations: 1000
-  batch_size: 64 # 512
+  batch_size: 4 # 512
   num_workers: 0 # 7
   task_size_proportional_sampling: true
   early_stop:
