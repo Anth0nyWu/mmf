@@ -155,7 +155,7 @@ class Pythia(BaseModel):
     def _init_classifier(self, combined_embedding_dim):
         # TODO: Later support multihead
         num_choices = registry.get(self._datasets[0] + "_num_final_outputs")
-
+        # print (num_choices)
         self.classifier = ClassifierLayer(
             self.config.classifier.type,
             in_dim=combined_embedding_dim,
@@ -188,24 +188,44 @@ class Pythia(BaseModel):
     def process_text_embedding(
         self, sample_list, embedding_attr="text_embeddings", info=None
     ):
+
+        # print("=====text embedding=====")
+
         text_embeddings = []
 
         # Get "text" attribute in case of "text_embeddings" case
         # and "context" attribute in case of "context_embeddings"
         texts = getattr(sample_list, embedding_attr.split("_")[0])
 
+        # print("text", texts.size())  # bs*20*300
+
         # Get embedding models
         text_embedding_models = getattr(self, embedding_attr)
 
         for text_embedding_model in text_embedding_models:
+            # print("text_model", text_embedding_model)
+            '''
+            text_model TextEmbedding(
+                (module): AttentionTextEmbedding(
+                    (recurrent_unit): LSTM(300, 1024, batch_first=True)
+                    (dropout): Dropout(p=0, inplace=False)
+                    (conv1): Conv1d(1024, 512, kernel_size=(1,), stride=(1,))
+                    (conv2): Conv1d(512, 2, kernel_size=(1,), stride=(1,))
+                    (relu): ReLU()
+                )
+            )
+            '''
             # TODO: Move this logic inside
             if isinstance(text_embedding_model, PreExtractedEmbedding):
                 embedding = text_embedding_model(sample_list.question_id)
             else:
                 embedding = text_embedding_model(texts)
+
+            # print("text_embedding: ", embedding.size()) # torch.Size([4, 2048])
             text_embeddings.append(embedding)
 
         text_embeddding_total = torch.cat(text_embeddings, dim=1)
+        # print("text_embedding_tot: ", text_embeddding_total.size()) # torch.Size([4, 2048])
 
         return text_embeddding_total
 

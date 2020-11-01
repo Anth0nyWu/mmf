@@ -3,20 +3,10 @@
 import torch
 from mmf.common.registry import registry
 from mmf.models.pythia import Pythia
-from mmf.modules.embeddings import (
-    ImageFeatureEmbedding,
-    MultiHeadImageFeatureEmbedding,
-    PreExtractedEmbedding,
-    TextEmbedding,
-)
-# from mmf.modules.layers import ClassifierLayer
+
 from mmf.modules.layers import MemNNLayer
 from torch import nn
-# from mmf.utils.build import (
-#     build_classifier_layer,
-#     build_image_encoder,
-#     build_text_encoder,
-# )
+
 
 @registry.register_model("memo_net")
 class MemoNet(Pythia):
@@ -40,15 +30,6 @@ class MemoNet(Pythia):
         self._init_extras()
 
     '''post_mn
-    def _init_MN(self):
-        self.MN = MemNNLayer(
-            # vocab_size, embd_size, ans_size, max_story_len,
-            vocab_size = self.config.mem_nn.vocab_size,
-            embd_size = self.config.mem_nn.embd_size,
-            ans_size = self.config.mem_nn.ans_size,
-            max_story_len = self.config.mem_nn.max_story_len,
-        )
-
     def process_MN(self, *args):
         image = args[0]  # x
         text = args[1]  # q
@@ -99,6 +80,23 @@ class MemoNet(Pythia):
             features.append(feature)
 
         feature_encoders = getattr(self, attr + "_feature_encoders")
+
+        # print("=====feat encoding=====")
+        # print("feat_encoders", feature_encoders)
+        '''
+        feat_encoders ModuleList(
+            (0): ImageFeatureEncoder(
+                (module): FinetuneFasterRcnnFpnFc7(
+                (lc): Linear(in_features=2048, out_features=2048, bias=True)
+                )
+            )
+            (1): ImageFeatureEncoder(
+                (module): Identity()
+            )
+        )
+
+        '''
+
         # Each feature should have a separate image feature encoders
         assert len(features) == len(feature_encoders), (
             "Number of feature encoders, {} are not equal "
@@ -110,8 +108,8 @@ class MemoNet(Pythia):
             # Get info related to the current feature. info is generally
             # in key of format "image_info_0" for 0th feature
             feature_info = getattr(sample_list, f"{attr}_info_{i:d}", {})
-            # print("feature_i: ", i, feature.size())
-            # print("feature_info", feature_info)
+            # print("feature_i: ", i, feature.size())   # torch.Size([4, 100/196, 2048])
+            # print("feature_info", feature_info)  # {}
             
             # For Pythia, we need max_features to mask attention
             feature_dim = getattr(feature_info, "max_features", None)
@@ -158,7 +156,6 @@ class MemoNet(Pythia):
         return feature_embedding_total, feature_attentions    
 
     def get_optimizer_parameters(self, config):
-        # combine_layer = self.MN
         combine_layer = self.image_text_multi_modal_combine_layer
         params = [
             {"params": self.word_embedding.parameters()},
@@ -174,11 +171,6 @@ class MemoNet(Pythia):
         ]
 
         return params
-
-    '''post_MN
-    # def _get_classifier_input_dim(self):
-    #     return self.MN.out_dim
-    '''
 
     def forward(self, sample_list):
 
@@ -205,7 +197,6 @@ class MemoNet(Pythia):
         if self.inter_model is not None:
             image_embedding_total = self.inter_model(image_embedding_total)
         
-        # pythia
         # print("image_embedding", image_embedding_total.size()) # [batch*4096]
         # print("text_embedding:" , image_embedding_total.size()) # [batch*4096]
         # print("=====combine layer=====")
@@ -224,21 +215,3 @@ class MemoNet(Pythia):
 
         return model_output
 
-
-        '''
-        # post_MN
-        image_embedding_total = image_embedding_total.unsqueeze(2)
-
-        # print("img_embedding_unsequeeze")
-        # print(image_embedding_total.size())
-
-        # model_output = {"scores": self.process_MN(image_embedding_total, text_embedding_total)}
-        
-        joint_embedding = self.process_MN(image_embedding_total, text_embedding_total)
-        # print("joint_emb", joint_embedding.size())
-        model_output = {"scores": self.calculate_logits(joint_embedding)}
-
-        # print("score:", model_output['scores'].size())
-
-        return model_output
-        '''

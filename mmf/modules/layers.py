@@ -854,7 +854,7 @@ class GMN(nn.Module):
 
 class MemNNLayer(nn.Module):
     # self, image_feat_dim, ques_emb_dim, **kwargs
-    def __init__(self, vocab_size, embd_size, ans_size, max_story_len, hops=3, dropout=0.05, te=False, pe=False):
+    def __init__(self, vocab_size, embd_size, ans_size, max_story_len, hops=3, dropout=0.1, te=False, pe=False):
         super(MemNNLayer, self).__init__()
         self.hops = hops
         self.embd_size = embd_size
@@ -863,7 +863,10 @@ class MemNNLayer(nn.Module):
 
         init_rng = 0.1
         self.dropout = nn.Dropout(p=dropout, inplace=True)
-        self.A = nn.ModuleList([nn.Embedding(vocab_size, embd_size) for _ in range(hops+1)])  #[d*n]
+        self.A = nn.ModuleList([nn.Embedding(vocab_size, embd_size) for _ in range(hops+1)])  #
+
+        print("emb_A", self.A[0], "*", len(self.A)) # (2048, 30) * 4
+
         for i in range(len(self.A)):
             self.A[i].weight.data.normal_(0, init_rng)
             self.A[i].weight.data[0] = 0 # for padding index
@@ -881,8 +884,8 @@ class MemNNLayer(nn.Module):
         # x (bs, story_len, s_sent_len) (batch_size, story_len, sentence length)
         # q (bs, q_sent_len)
 
-        # print("x:",x)
-        # print("q:", q)
+        # print("x:",x.size()) # x: torch.Size([4, 100, 2048])
+        # print("q:", q.size()) # torch.Size([4, 2048])
 
         bs = x.size(0)
         story_len = x.size(1)
@@ -908,14 +911,20 @@ class MemNNLayer(nn.Module):
         x = x.view(bs*story_len, -1) # (bs*story_len, s_sent_len)
 
         q=q.long()
-        u = self.dropout(self.B(q)) # (bs, q_sent_len, embd_size)
-        u = torch.sum(u, 1) # (bs, embd_size)
+        u = self.dropout(self.B(q)) # (bs, q_sent_len, embd_size) [4, 2048, 30]
+        print("emb_B", self.B)
+        # print("B(q)", self.B(q).size())
+        # print("u1", u.size())
+        u = torch.sum(u, 1) # (bs, embd_size) [4, 30]
+        # print("u2", u.size())
 
         # Adjacent weight tying
         for k in range(self.hops):
             x=x.long()
             m = self.dropout(self.A[k](x))            # (bs*story_len, s_sent_len, embd_size)
+            # print("m1", m.size())
             m = m.view(bs, story_len, s_sent_len, -1) # (bs, story_len, s_sent_len, embd_size)
+            # print("m2", m.size())
             if self.position_encoding:
                 m *= pe # (bs, story_len, s_sent_len, embd_size)
             m = torch.sum(m, 2) # (bs, story_len, embd_size)
@@ -923,26 +932,37 @@ class MemNNLayer(nn.Module):
                 m += self.TA.repeat(bs, 1, 1)[:, :story_len, :]
 
             c = self.dropout(self.A[k+1](x))           # (bs*story_len, s_sent_len, embd_size)
+            # print("c1:", c.size()) # [784/400, 2048, 30]
             c = c.view(bs, story_len, s_sent_len, -1)  # (bs, story_len, s_sent_len, embd_size)
             c = torch.sum(c, 2)                        # (bs, story_len, embd_size)
+            # print("c2:", c.size()) # [4, 196/100, 30]
+
             if self.temporal_encoding:
                 c += self.TC.repeat(bs, 1, 1)[:, :story_len, :] # (bs, story_len, embd_size)
 
-            p = torch.bmm(m, u.unsqueeze(2)).squeeze() # (bs, story_len)
-            p = F.softmax(p, -1).unsqueeze(1)          # (bs, 1, story_len)
-            o = torch.bmm(p, c).squeeze(1)             # use m as c, (bs, embd_size)
-            u = o + u # (bs, embd_size)
+            m = torch.bmm(m, u.unsqueeze(2)).squeeze() # (bs, story_len)
+            m = F.softmax(m, -1).unsqueeze(1)          # (bs, 1, story_len)
+            m = torch.bmm(m, c).squeeze(1)             # use m as c, (bs, embd_size)
+            u = m + u # (bs, embd_size)
+
+            # p = torch.bmm(m, u.unsqueeze(2)).squeeze() # (bs, story_len)
+            # p = F.softmax(p, -1).unsqueeze(1)          # (bs, 1, story_len)
+            # o = torch.bmm(p, c).squeeze(1)             # use m as c, (bs, embd_size)
+            # u = o + u # (bs, embd_size)
 
         W = torch.t(self.A[-1].weight) # (embd_size, vocab_size)
-        out = torch.bmm(u.unsqueeze(1), W.unsqueeze(0).repeat(bs, 1, 1)).squeeze() # (bs, ans_size)
+        # print("W:", W.size())  # torch.Size([30, 2048])
+       
+        u = torch.bmm(u.unsqueeze(1), W.unsqueeze(0).repeat(bs, 1, 1)).squeeze() # (bs, ans_size)
+        # out = torch.bmm(u.unsqueeze(1), W.unsqueeze(0).repeat(bs, 1, 1)).squeeze() # (bs, ans_size)
         # self.out_dim = out.size()
-        # print("out_dim")
-        # print (self.out_dim)
-        # print("out")
-        # print(out.size())
+        # print("out_dim", self.out_dim)  # 300 seems useless
+        # print("out", out.size())  # torch.Size([4, 2048])
         # print("softmax")
-        # print(F.log_softmax(out, -1).size())
+        # print("sotfmax", F.log_softmax(out, -1).size()) # torch.Size([4, 2048])
 
-        return out
+        return u
+        # return out
+
         # return F.log_softmax(out, -1)
 
