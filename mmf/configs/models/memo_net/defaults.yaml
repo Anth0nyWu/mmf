@@ -56,6 +56,6 @@ model_config:
 
     mem_nn:
       max_story_len: 196
-      embd_size: 30
+      embd_size: 70
       vocab_size: 2048 # fix 2048
       ans_size: 300
