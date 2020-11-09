@@ -912,7 +912,7 @@ class MemNNLayer(nn.Module):
 
         q=q.long()
         u = self.dropout(self.B(q)) # (bs, q_sent_len, embd_size) [4, 2048, 30]
-        print("emb_B", self.B)
+        # print("emb_B", self.B)
         # print("B(q)", self.B(q).size())
         # print("u1", u.size())
         u = torch.sum(u, 1) # (bs, embd_size) [4, 30]
@@ -948,12 +948,16 @@ class MemNNLayer(nn.Module):
             # p = torch.bmm(m, u.unsqueeze(2)).squeeze() # (bs, story_len)
             # p = F.softmax(p, -1).unsqueeze(1)          # (bs, 1, story_len)
             # o = torch.bmm(p, c).squeeze(1)             # use m as c, (bs, embd_size)
-            # u = o + u # (bs, embd_size)
+            # u = o + u # (bs, embd_size)[4,30]
 
         W = torch.t(self.A[-1].weight) # (embd_size, vocab_size)
+        # A is a list of embedders, of which weight is in shape of [2048,30]
+        # print("W_t", self.A[-1].weight)
         # print("W:", W.size())  # torch.Size([30, 2048])
+        # print("W:", W)
        
         u = torch.bmm(u.unsqueeze(1), W.unsqueeze(0).repeat(bs, 1, 1)).squeeze() # (bs, ans_size)
+        # [bs, 1, 30]*[bs,30,2048]=>[bs, 2048]
         # out = torch.bmm(u.unsqueeze(1), W.unsqueeze(0).repeat(bs, 1, 1)).squeeze() # (bs, ans_size)
         # self.out_dim = out.size()
         # print("out_dim", self.out_dim)  # 300 seems useless
