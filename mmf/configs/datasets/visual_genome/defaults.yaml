@@ -5,6 +5,10 @@ dataset_config:
       fast_read: false
       use_images: false
       use_features: true
+      
+      # add_answer: true
+      # max_features: 36
+      
       features:
           train:
           - visual_genome/detectron_fix_100/fc6/,visual_genome/resnet152/
@@ -31,11 +35,19 @@ dataset_config:
           - imdb/visual_genome/vg_scene_graphs_placeholder.jsonl
       region_descriptions:
           train:
-          - imdb/visual_genome/vg_region_descriptions.json
+          - imdb/visual_genome/vg_region_descriptions.jsonl
           val:
           - imdb/visual_genome/vg_region_descriptions_placeholder.jsonl
           test:
           - imdb/visual_genome/vg_region_descriptions_placeholder.jsonl
+      metadatas:
+          train:
+          - imdb/visual_genome/vg_image_metadata.jsonl
+          val:
+          - imdb/visual_genome/vg_image_metadata_placeholder.jsonl
+          test:
+          - imdb/visual_genome/vg_image_metadata_placeholder.jsonl
+
       max_features: 100
       processors:
         text_processor:

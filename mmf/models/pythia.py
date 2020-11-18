@@ -257,7 +257,7 @@ class Pythia(BaseModel):
         extra = sample_list.get_fields(extra)
 
         feature_idx = 0
-        print("=====feature encoder=====")
+        # print("=====feature encoder=====")
 
         # Get all of the features, which are in the form, "image_feature_0"
         # "image_feature_1" ...
@@ -281,8 +281,8 @@ class Pythia(BaseModel):
             # Get info related to the current feature. info is generally
             # in key of format "image_info_0" for 0th feature
             feature_info = getattr(sample_list, f"{attr}_info_{i:d}", {})
-            print("feature_i: ", i, feature.size())
-            print("feature_info", feature_info)
+            # print("feature_i: ", i, feature.size())
+            # print("feature_info", feature_info)
             
             # For Pythia, we need max_features to mask attention
             feature_dim = getattr(feature_info, "max_features", None)
@@ -296,7 +296,7 @@ class Pythia(BaseModel):
             # "context_feature_encoders"
             encoders_attr = attr + "_feature_encoders"
             feature_encoder = getattr(self, encoders_attr)[i]   #repeat of line 271
-            print("feature_encoder", feature_encoder)
+            # print("feature_encoder", feature_encoder)
             '''
             feature_i:  0 torch.Size([64, 100, 2048])
             feature_info {}
@@ -315,8 +315,8 @@ class Pythia(BaseModel):
             # Encode the features
             encoded_feature = feature_encoder(feature)
 
-            print("encoded_feat:", encoded_feature.size()) # torch.Size([64, 100, 2048])
-            print("=====feat_embedding", i, "===== ")
+            # print("encoded_feat:", encoded_feature.size()) # torch.Size([64, 100, 2048])
+            # print("=====feat_embedding", i, "===== ")
 
             # Get all of the feature embeddings
             list_attr = attr + "_feature_embeddings_list"
@@ -326,17 +326,17 @@ class Pythia(BaseModel):
             for feature_embedding_model in feature_embedding_models:
                 inp = (encoded_feature, text_embedding_total, feature_dim, extra)
                 # torch.Size([64, 100, 2048]), [64,2048], none, samplelist()
-                print(feature_embedding_model)
-                print(encoded_feature.size())
+                # print(feature_embedding_model)
+                # print(encoded_feature.size())
                 # print(text_embedding_total.size())
 
                 embedding, attention = feature_embedding_model(*inp)
                 feature_embeddings.append(embedding)
                 feature_attentions.append(attention.squeeze(-1))
 
-                print("feature_embeddings_&_attns")
-                print(embedding.size())  # torch.Size([64, 2048])
-                print(attention.size()) # torch.Size([64, 196, 1])
+                # print("feature_embeddings_&_attns")
+                # print(embedding.size())  # torch.Size([64, 2048])
+                # print(attention.size()) # torch.Size([64, 196, 1])
 
         # Concatenate all features embeddings and return along with attention
         feature_embedding_total = torch.cat(feature_embeddings, dim=1)
@@ -357,6 +357,17 @@ class Pythia(BaseModel):
         return self.classifier(joint_embedding)
 
     def forward(self, sample_list):
+        print ("=====sample_list=====")
+        print(sample_list.fields())
+        for key in sample_list.keys():
+            print(key+":")
+            if isinstance(sample_list[key],str) :
+                print("str:", sample_list[key])
+            elif isinstance(sample_list[key],dict) :
+                for key2 in sample_list[key].keys():
+                    print(key2+":")
+                    print(type(sample_list[key][key2]))
+
         sample_list.text = self.word_embedding(sample_list.text)
         text_embedding_total = self.process_text_embedding(sample_list)
 
