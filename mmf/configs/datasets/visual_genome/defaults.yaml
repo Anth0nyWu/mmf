@@ -13,6 +13,7 @@ dataset_config:
           train:
           - visual_genome/detectron_fix_100/fc6/,visual_genome/resnet152/
           # - visual_genome/resnet152/
+          # [bs, 100, 2048] feature of regions faster-rcnn fc7, [bs, 196,2048] feature of all image
           val:
           - visual_genome/detectron_fix_100/fc6/,visual_genome/resnet152/
           # - visual_genome/resnet152/

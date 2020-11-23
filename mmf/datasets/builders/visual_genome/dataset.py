@@ -95,10 +95,10 @@ class VisualGenomeDataset(VQA2Dataset):
         if self._check_unk(sample_info):
             return self.load_item((idx + 1) % len(self.annotation_db))
 
-        current_sample = super().load_item(idx)
+        current_sample = super().load_item(idx) # convert question to encoded vector here
         # print("current sample", current_sample)
         current_sample = self._load_scene_graph(idx, current_sample)
-        current_sample = self._load_region_description(idx, current_sample)
+        current_sample = self._load_region_description(idx, current_sample) # also include text processor for region descriptions
 
         # print("region current sample", current_sample)
         return current_sample

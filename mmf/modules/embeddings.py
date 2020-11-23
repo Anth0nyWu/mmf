@@ -77,9 +77,11 @@ class BiLSTMTextEmbedding(nn.Module):
         dropout,
         bidirectional=False,
         rnn_type="GRU",
+        **kwargs
     ):
         super().__init__()
-        self.text_out_dim = hidden_dim
+        self.text_out_dim = kwargs["out_dim"]
+        self.num_hid = hidden_dim
         self.bidirectional = bidirectional
 
         if rnn_type == "LSTM":

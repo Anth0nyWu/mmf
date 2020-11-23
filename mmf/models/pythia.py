@@ -2,6 +2,7 @@
 import copy
 
 import torch
+import numpy as np
 from mmf.common.registry import registry
 from mmf.models.base_model import BaseModel
 from mmf.modules.embeddings import (
@@ -79,7 +80,7 @@ class Pythia(BaseModel):
         feature_dim = self.config[attr + "_feature_dim"]
         setattr(self, attr + "_feature_dim", feature_dim)
 
-        print("feat_encoders_list_config", feat_encoders_list_config)
+        # print("feat_encoders_list_config", feat_encoders_list_config)
 
         for feat_encoder in feat_encoders_list_config:
             encoder_type = feat_encoder.type
@@ -201,7 +202,7 @@ class Pythia(BaseModel):
         self, sample_list, embedding_attr="text_embeddings", info=None
     ):
 
-        # print("=====text embedding=====")
+        print("=====text embedding=====")
 
         text_embeddings = []
 
@@ -233,11 +234,12 @@ class Pythia(BaseModel):
             else:
                 embedding = text_embedding_model(texts)
 
-            # print("text_embedding: ", embedding.size()) # torch.Size([4(bs), 2048])
+            print("text_embedding: ", embedding.size()) 
+            # torch.Size([4(bs), 2048])
             text_embeddings.append(embedding)
 
         text_embeddding_total = torch.cat(text_embeddings, dim=1)
-        # print("text_embedding_tot: ", text_embeddding_total.size()) # torch.Size([4(bs), 2048])
+        print("text_embedding_tot: ", text_embeddding_total.size()) # torch.Size([4(bs), 2048])
 
         return text_embeddding_total
 
@@ -257,11 +259,7 @@ class Pythia(BaseModel):
         extra = sample_list.get_fields(extra)
 
         feature_idx = 0
-<<<<<<< HEAD
-        print("=====feature encoder=====")
-=======
         # print("=====feature encoder=====")
->>>>>>> visual_genome
 
         # Get all of the features, which are in the form, "image_feature_0"
         # "image_feature_1" ...
@@ -285,8 +283,8 @@ class Pythia(BaseModel):
             # Get info related to the current feature. info is generally
             # in key of format "image_info_0" for 0th feature
             feature_info = getattr(sample_list, f"{attr}_info_{i:d}", {})
-            print("feature_i: ", i, feature.size())
-            print("feature_info", feature_info)
+            # print("feature_i: ", i, feature.size())
+            # print("feature_info", feature_info)
             
             # For Pythia, we need max_features to mask attention
             feature_dim = getattr(feature_info, "max_features", None)
@@ -300,11 +298,7 @@ class Pythia(BaseModel):
             # "context_feature_encoders"
             encoders_attr = attr + "_feature_encoders"
             feature_encoder = getattr(self, encoders_attr)[i]   #repeat of line 271
-<<<<<<< HEAD
-            print("feature_encoder", feature_encoder)
-=======
             # print("feature_encoder", feature_encoder)
->>>>>>> visual_genome
             '''
             feature_i:  0 torch.Size([64, 100, 2048])
             feature_info {}
@@ -323,13 +317,8 @@ class Pythia(BaseModel):
             # Encode the features
             encoded_feature = feature_encoder(feature)
 
-<<<<<<< HEAD
-            print("encoded_feat:", encoded_feature.size()) # torch.Size([64, 100, 2048])
-            print("=====feat_embedding", i, "===== ")
-=======
             # print("encoded_feat:", encoded_feature.size()) # torch.Size([64, 100, 2048])
             # print("=====feat_embedding", i, "===== ")
->>>>>>> visual_genome
 
             # Get all of the feature embeddings
             list_attr = attr + "_feature_embeddings_list"
@@ -339,8 +328,8 @@ class Pythia(BaseModel):
             for feature_embedding_model in feature_embedding_models:
                 inp = (encoded_feature, text_embedding_total, feature_dim, extra)
                 # torch.Size([64, 100, 2048]), [64,2048], none, samplelist()
-                print(feature_embedding_model)
-                print(encoded_feature.size())
+                # print(feature_embedding_model)
+                # print(encoded_feature.size())
                 # print(text_embedding_total.size())
 
                 embedding, attention = feature_embedding_model(*inp)
@@ -374,12 +363,25 @@ class Pythia(BaseModel):
         print(sample_list.fields())
         for key in sample_list.keys():
             print(key+":")
+            # print(type(sample_list[key]))
             if isinstance(sample_list[key],str) :
                 print("str:", sample_list[key])
-            elif isinstance(sample_list[key],dict) :
+            elif isinstance(sample_list[key],dict) : # region description: dict
                 for key2 in sample_list[key].keys():
-                    print(key2+":")
-                    print(type(sample_list[key][key2]))
+                    print("    "+key2+":")
+                    # if type(sample_list[key][key2]) is np.ndarray:
+                    #     print(sample_list[key][key2].shape)
+                    # else:
+                    #     print(sample_list[key][key2])
+                    # print(sample_list[key][key2])
+            elif isinstance(sample_list[key],list) :
+                for i in sample_list[key]:  # image info 1: [none, ]
+                    if i != None:
+                        print(i.keys(), i.values)
+                    else: 
+                        print (i)
+            else: 
+                print(sample_list[key].size())
 
         sample_list.text = self.word_embedding(sample_list.text)
         text_embedding_total = self.process_text_embedding(sample_list)
@@ -392,7 +394,7 @@ class Pythia(BaseModel):
             image_embedding_total = self.inter_model(image_embedding_total)
 
         # print("image_embedding", image_embedding_total.size())  # [batch*4096]
-        # print("text_embedding:" , image_embedding_total.size())  # [batch*4096]
+        # print("text_embedding:" , text_embedding_total.size())  # [batch*?]
         # print("=====combine layer=====")
 
         joint_embedding = self.combine_embeddings(

@@ -2,17 +2,29 @@ model_config:
   gmn: &gmn
     model_data_dir: ${env.data_dir}
 
+    # text_embeddings:
+    # - type: attention
+    #   params:
+    #     hidden_dim: 1024
+    #     num_layers: 1
+    #     conv1_out: 512
+    #     conv2_out: 2
+    #     dropout: 0
+    #     embedding_dim: 300 
+    #     kernel_size: 1
+    #     padding: 0
+    #     model_data_dir: ${model_config.gmn.model_data_dir}
     text_embeddings:
-    - type: attention
+    - type: bilstm
       params:
-        hidden_dim: 1024
-        num_layers: 1
-        conv1_out: 512
-        conv2_out: 2
-        dropout: 0
+        hidden_dim: 1280
+        out_dim: 1280 
+        # vocab_size: 1280
         embedding_dim: 300
-        kernel_size: 1
-        padding: 0
+        num_layers: 1
+        dropout: 0.0
+        bidirectional: False
+        rnn_type: 'GRU'
         model_data_dir: ${model_config.gmn.model_data_dir}
     
     image_feature_embeddings:
