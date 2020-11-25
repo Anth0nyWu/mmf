@@ -834,7 +834,9 @@ class GlobalModel(nn.Module):
         return self.global_mlp(out)
 
 
-class GMN(nn.Module):
+class GparhMemoryLayer(nn.Module):
+    # def __init__(self, vocab_size, embd_size, ans_size, max_story_len, hops=3, dropout=0.1, te=False, pe=False):
+
     """
     metalayer
     https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#torch_geometric.nn.meta.MetaLayer
@@ -969,4 +971,6 @@ class MemNNLayer(nn.Module):
         # return out
 
         # return F.log_softmax(out, -1)
+
+
 

@@ -18,7 +18,7 @@ model_config:
     - type: bilstm
       params:
         hidden_dim: 1280
-        out_dim: 1280 
+        out_dim: 2048 
         # vocab_size: 1280
         embedding_dim: 300
         num_layers: 1

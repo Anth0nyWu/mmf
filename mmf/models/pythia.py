@@ -373,7 +373,7 @@ class Pythia(BaseModel):
                     #     print(sample_list[key][key2].shape)
                     # else:
                     #     print(sample_list[key][key2])
-                    # print(sample_list[key][key2])
+                    print(sample_list[key][key2])
             elif isinstance(sample_list[key],list) :
                 for i in sample_list[key]:  # image info 1: [none, ]
                     if i != None:

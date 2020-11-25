@@ -116,6 +116,7 @@ class VisualGenomeDataset(VQA2Dataset):
         # image width/length
         image_info["height"] = self.image_metadata_db[img_id]["height"]
         image_info["width"] = self.image_metadata_db[img_id]["width"]
+        image_info["url"] = self.image_metadata_db[img_id]["url"]
 
         return image_info
 
@@ -318,6 +319,7 @@ class VisualGenomeDataset(VQA2Dataset):
         # print("regions", regions)
         regions = SampleList(regions)
         regions["image_id"]=torch.tensor(regions["image_id"][0], dtype = torch.int32)
+        regions["image_url"]=image_info["url"]
         # print("regions sample list", regions)
         return regions, region_map
 
