@@ -22,33 +22,46 @@ class MMFDataset(BaseDataset):
     ):
         super().__init__(dataset_name, config, dataset_type, *args, **kwargs)
         self._index = index
+        # print("===init mmf database===")
+        # print("index", index,"dataset_name", dataset_name)  # 0; visual_genome
         self.annotation_db = self.build_annotation_db()
 
         self._use_images = self.config.get("use_images", False)
         if self._use_images:
+            # print("use_img_true")
             self.image_db = self.build_image_db()
 
         self._use_features = self.config.get("use_features", False)
         if self._use_features:
+            # print("use_feat_true")
             self.features_db = self.build_features_db()
 
     def build_annotation_db(self):
         annotation_path = self._get_path_based_on_index(
             self.config, "annotations", self._index
         )
+        # print("annotation_path:", annotation_path)  
+        #/media/ubuntu/MyDisk/data_mmf/vg/imdb/visual_genome/vg_question_answers_placeholder.jsonl
         return AnnotationDatabase(self.config, annotation_path)
 
     def build_features_db(self):
         features_path = self._get_path_based_on_index(
             self.config, "features", self._index
         )
+        # print("features_path:", features_path)
+        # /media/ubuntu/MyDisk/data_mmf/vg/visual_genome/detectron_fix_100/fc6/,/media/ubuntu/MyDisk/data_mmf/vg/visual_genome/resnet152/
         return FeaturesDatabase(
             self.config, features_path, annotation_db=self.annotation_db
         )
 
     def build_image_db(self):
-        image_path = self._get_path_based_on_index(self.config, "images", self._index)
-        return ImageDatabase(self.config, image_path, annotation_db=self.annotation_db)
+        image_path = self._get_path_based_on_index(
+            self.config, "images", self._index
+        )
+        # print("image_path:", image_path)
+        return ImageDatabase(
+            self.config, image_path, annotation_db=self.annotation_db
+        )
 
     def _get_path_based_on_index(self, config, attribute, index):
         if attribute not in config:

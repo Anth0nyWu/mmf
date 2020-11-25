@@ -12,6 +12,12 @@ from torch.nn import Sequential as Seq, Linear as Lin, ReLU
 from torch_scatter import scatter_mean
 from torch_geometric.nn import MetaLayer
 
+import torch.nn as nn
+import torch.nn.functional as F
+import copy
+import math
+from torch.autograd import Variable
+
 class ConvNet(nn.Module):
     def __init__(
         self,
@@ -251,6 +257,11 @@ class ModalCombineLayer(nn.Module):
             self.module = TwoLayerElementMultiply(img_feat_dim, txt_emb_dim, **kwargs)
         elif combine_type == "top_down_attention_lstm":
             self.module = TopDownAttentionLSTM(img_feat_dim, txt_emb_dim, **kwargs)
+        elif combine_type == "mem_nn":
+            # print (img_feat_dim, txt_emb_dim, kwargs)
+            # (2048, 2048, params{'dropout': 0, 'hidden_dim': 5000})
+            # self, vocab_size, embd_size, ans_size, max_story_len, hops=3, dropout=0.2, te=True, pe=True
+            self.module = MemNNLayer(**kwargs)
         else:
             raise NotImplementedError("Not implemented combine type: %s" % combine_type)
 
@@ -366,6 +377,11 @@ class MFH(nn.Module):
 class NonLinearElementMultiply(nn.Module):
     def __init__(self, image_feat_dim, ques_emb_dim, **kwargs):
         super().__init__()
+
+        # print("img_feat_dim", image_feat_dim)
+        # print("que_emb_dim", image_feat_dim)
+        # print ("kwargs", kwargs)
+
         self.fa_image = ReLUWithWeightNormFC(image_feat_dim, kwargs["hidden_dim"])
         self.fa_txt = ReLUWithWeightNormFC(ques_emb_dim, kwargs["hidden_dim"])
 
@@ -379,6 +395,11 @@ class NonLinearElementMultiply(nn.Module):
     def forward(self, image_feat, question_embedding, context_embedding=None):
         image_fa = self.fa_image(image_feat)
         question_fa = self.fa_txt(question_embedding)
+
+        # print("image_fa:")
+        # print(image_fa.size())
+        # print("question_fa:")
+        # print(question_fa.size())
 
         if len(image_feat.size()) == 3 and len(question_fa.size()) != 3:
             question_fa_expand = question_fa.unsqueeze(1)
@@ -394,6 +415,9 @@ class NonLinearElementMultiply(nn.Module):
             joint_feature = torch.cat([joint_feature, context_text_joint_feaure], dim=1)
 
         joint_feature = self.dropout(joint_feature)
+
+        # print("joint_feature in layer:")
+        # print(joint_feature.size())
 
         return joint_feature
 
@@ -810,7 +834,9 @@ class GlobalModel(nn.Module):
         return self.global_mlp(out)
 
 
-class GMN(nn.Module):
+class GparhMemoryLayer(nn.Module):
+    # def __init__(self, vocab_size, embd_size, ans_size, max_story_len, hops=3, dropout=0.1, te=False, pe=False):
+
     """
     metalayer
     https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#torch_geometric.nn.meta.MetaLayer
@@ -826,3 +852,125 @@ class GMN(nn.Module):
             return torch.stack(feat, dim=1)
 
         return self.linears[0](joint_embedding)
+
+
+class MemNNLayer(nn.Module):
+    # self, image_feat_dim, ques_emb_dim, **kwargs
+    def __init__(self, vocab_size, embd_size, ans_size, max_story_len, hops=3, dropout=0.1, te=False, pe=False):
+        super(MemNNLayer, self).__init__()
+        self.hops = hops
+        self.embd_size = embd_size
+        self.temporal_encoding = te
+        self.position_encoding = pe
+
+        init_rng = 0.1
+        self.dropout = nn.Dropout(p=dropout, inplace=True)
+        self.A = nn.ModuleList([nn.Embedding(vocab_size, embd_size) for _ in range(hops+1)])  #
+
+        print("emb_A", self.A[0], "*", len(self.A)) # (2048, 30) * 4
+
+        for i in range(len(self.A)):
+            self.A[i].weight.data.normal_(0, init_rng)
+            self.A[i].weight.data[0] = 0 # for padding index
+        self.B = self.A[0] # query encoder
+
+        # Temporal Encoding: see 4.1
+        if self.temporal_encoding:
+            self.TA = nn.Parameter(torch.Tensor(1, max_story_len, embd_size).normal_(0, 0.1))
+            self.TC = nn.Parameter(torch.Tensor(1, max_story_len, embd_size).normal_(0, 0.1))
+
+        self.out_dim = ans_size
+
+    def forward(self, x, q):
+        # print("===MN===")
+        # x (bs, story_len, s_sent_len) (batch_size, story_len, sentence length)
+        # q (bs, q_sent_len)
+
+        # print("x:",x.size()) # x: torch.Size([4, 100, 2048])
+        # print("q:", q.size()) # torch.Size([4, 2048])
+
+        bs = x.size(0)
+        story_len = x.size(1)
+        s_sent_len = x.size(2)
+
+        # Position Encoding
+        if self.position_encoding:
+            J = s_sent_len
+            d = self.embd_size
+            # pe = to_var(torch.zeros(J, d)) # (s_sent_len, embd_size)
+            pe = torch.zeros(J, d)
+            if torch.cuda.is_available():
+                pe = Variable(pe.cuda())
+
+
+            for j in range(1, J+1):
+                for k in range(1, d+1):
+                    l_kj = (1 - j / J) - (k / d) * (1 - 2 * j / J)
+                    pe[j-1][k-1] = l_kj
+            pe = pe.unsqueeze(0).unsqueeze(0) # (1, 1, s_sent_len, embd_size)
+            pe = pe.repeat(bs, story_len, 1, 1) # (bs, story_len, s_sent_len, embd_size)
+
+        x = x.view(bs*story_len, -1) # (bs*story_len, s_sent_len)
+
+        q=q.long()
+        u = self.dropout(self.B(q)) # (bs, q_sent_len, embd_size) [4, 2048, 30]
+        # print("emb_B", self.B)
+        # print("B(q)", self.B(q).size())
+        # print("u1", u.size())
+        u = torch.sum(u, 1) # (bs, embd_size) [4, 30]
+        # print("u2", u.size())
+
+        # Adjacent weight tying
+        for k in range(self.hops):
+            x=x.long()
+            m = self.dropout(self.A[k](x))            # (bs*story_len, s_sent_len, embd_size)
+            # print("m1", m.size())
+            m = m.view(bs, story_len, s_sent_len, -1) # (bs, story_len, s_sent_len, embd_size)
+            # print("m2", m.size())
+            if self.position_encoding:
+                m *= pe # (bs, story_len, s_sent_len, embd_size)
+            m = torch.sum(m, 2) # (bs, story_len, embd_size)
+            if self.temporal_encoding:
+                m += self.TA.repeat(bs, 1, 1)[:, :story_len, :]
+
+            c = self.dropout(self.A[k+1](x))           # (bs*story_len, s_sent_len, embd_size)
+            # print("c1:", c.size()) # [784/400, 2048, 30]
+            c = c.view(bs, story_len, s_sent_len, -1)  # (bs, story_len, s_sent_len, embd_size)
+            c = torch.sum(c, 2)                        # (bs, story_len, embd_size)
+            # print("c2:", c.size()) # [4, 196/100, 30]
+
+            if self.temporal_encoding:
+                c += self.TC.repeat(bs, 1, 1)[:, :story_len, :] # (bs, story_len, embd_size)
+
+            m = torch.bmm(m, u.unsqueeze(2)).squeeze() # (bs, story_len)
+            m = F.softmax(m, -1).unsqueeze(1)          # (bs, 1, story_len)
+            m = torch.bmm(m, c).squeeze(1)             # use m as c, (bs, embd_size)
+            u = m + u # (bs, embd_size)
+
+            # p = torch.bmm(m, u.unsqueeze(2)).squeeze() # (bs, story_len)
+            # p = F.softmax(p, -1).unsqueeze(1)          # (bs, 1, story_len)
+            # o = torch.bmm(p, c).squeeze(1)             # use m as c, (bs, embd_size)
+            # u = o + u # (bs, embd_size)[4,30]
+
+        W = torch.t(self.A[-1].weight) # (embd_size, vocab_size)
+        # A is a list of embedders, of which weight is in shape of [2048,30]
+        # print("W_t", self.A[-1].weight)
+        # print("W:", W.size())  # torch.Size([30, 2048])
+        # print("W:", W)
+       
+        u = torch.bmm(u.unsqueeze(1), W.unsqueeze(0).repeat(bs, 1, 1)).squeeze() # (bs, ans_size)
+        # [bs, 1, 30]*[bs,30,2048]=>[bs, 2048]
+        # out = torch.bmm(u.unsqueeze(1), W.unsqueeze(0).repeat(bs, 1, 1)).squeeze() # (bs, ans_size)
+        # self.out_dim = out.size()
+        # print("out_dim", self.out_dim)  # 300 seems useless
+        # print("out", out.size())  # torch.Size([4, 2048])
+        # print("softmax")
+        # print("sotfmax", F.log_softmax(out, -1).size()) # torch.Size([4, 2048])
+
+        return u
+        # return out
+
+        # return F.log_softmax(out, -1)
+
+
+

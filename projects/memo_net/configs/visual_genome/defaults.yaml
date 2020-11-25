@@ -4,14 +4,14 @@ dataset_config:
     return_objects: false
     return_relationships: false
     return_features_info: false
-    return_region_descriptions: false
+    return_region_descriptions: true
     no_unk: true
 
 optimizer:
   type: Adamax
   params:
     eps: 1.0e-08
-    lr: 0.01
+    lr: 0.005 # 0.01
     weight_decay: 0
 
 evaluation:
@@ -29,12 +29,12 @@ training:
   # - 20000
   # - 21000
   max_grad_l2_norm: 0.25
-  max_updates: 22000
+  max_updates: 222000
   use_warmup: true
   warmup_factor: 0.2
-  warmup_iterations: 1000
-  batch_size: 64 # 512
-  num_workers: 5 # 7
+  warmup_iterations: 3000
+  batch_size: 4 # 512
+  num_workers: 0 # 7
   task_size_proportional_sampling: true
   early_stop:
     criteria: visual_genome/vqa_accuracy

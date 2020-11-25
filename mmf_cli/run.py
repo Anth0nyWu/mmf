@@ -88,6 +88,7 @@ def run(opts: typing.Optional[typing.List[str]] = None, predict: bool = False):
         args = argparse.Namespace(config_override=None)
         args.opts = opts
 
+    print(args)
     configuration = Configuration(args)
     # Do set runtime args which can be changed by MMF
     configuration.args = args

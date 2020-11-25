@@ -14,6 +14,7 @@ class AttentionLayer(nn.Module):
 
         combine_type = kwargs["modal_combine"]["type"]
         combine_params = kwargs["modal_combine"]["params"]
+        # print("Attn_layer:" , combine_type, image_dim, question_dim, combine_params)
         modal_combine_layer = ModalCombineLayer(
             combine_type, image_dim, question_dim, **combine_params
         )

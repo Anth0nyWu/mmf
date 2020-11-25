@@ -88,6 +88,7 @@ class FeaturesDatabase(ImageDatabase):
     def __getitem__(self, idx):
         self._check_annotation_db_present()
         image_info = self.annotation_db[idx]
+        # print(image_info)
         return self.get(image_info)
 
     def get(self, item):
@@ -95,12 +96,13 @@ class FeaturesDatabase(ImageDatabase):
 
         if feature_path is None:
             feature_path = self._get_feature_path_based_on_image(item)
-
+            # print(feature_path)
         return self.from_path(feature_path)
 
     def from_path(self, path):
         assert isinstance(path, str)
 
+        # print(path)
         if "genome" in path and path.endswith(".npy"):
             path = str(int(path.split("_")[-1].split(".")[0])) + ".npy"
 
@@ -117,5 +119,7 @@ class FeaturesDatabase(ImageDatabase):
 
     def _get_feature_path_based_on_image(self, item):
         image_path = self._get_attrs(item)[0]
-        feature_path = ".".join(image_path.split(".")[:-1]) + ".npy"
+        # print (str(image_path).split("."))
+        # feature_path = ".".join(str(image_path).split(".")[:-1]) + ".npy"
+        feature_path = ".".join(str(image_path).split(".")) + ".npy"
         return feature_path

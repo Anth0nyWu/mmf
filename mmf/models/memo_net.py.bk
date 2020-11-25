@@ -3,10 +3,20 @@
 import torch
 from mmf.common.registry import registry
 from mmf.models.pythia import Pythia
-
+from mmf.modules.embeddings import (
+    ImageFeatureEmbedding,
+    MultiHeadImageFeatureEmbedding,
+    PreExtractedEmbedding,
+    TextEmbedding,
+)
+# from mmf.modules.layers import ClassifierLayer
 from mmf.modules.layers import MemNNLayer
 from torch import nn
-
+# from mmf.utils.build import (
+#     build_classifier_layer,
+#     build_image_encoder,
+#     build_text_encoder,
+# )
 
 @registry.register_model("memo_net")
 class MemoNet(Pythia):
@@ -30,6 +40,15 @@ class MemoNet(Pythia):
         self._init_extras()
 
     '''post_mn
+    def _init_MN(self):
+        self.MN = MemNNLayer(
+            # vocab_size, embd_size, ans_size, max_story_len,
+            vocab_size = self.config.mem_nn.vocab_size,
+            embd_size = self.config.mem_nn.embd_size,
+            ans_size = self.config.mem_nn.ans_size,
+            max_story_len = self.config.mem_nn.max_story_len,
+        )
+
     def process_MN(self, *args):
         image = args[0]  # x
         text = args[1]  # q
@@ -39,12 +58,9 @@ class MemoNet(Pythia):
     '''
     def _init_MN(self,attr):
         self.MNs=[]
-        self.FCs=[]
-        self.FCs_inverse=[]
         num_feature_feat = len(getattr(self.config, f"{attr}_feature_encodings"))
 
-        for i in range(num_feature_feat):
-            # feature = getattr(sample_list, f"{attr}_feature_{feature_idx:d}", None)
+        for _ in range(num_feature_feat):
             self.MN = MemNNLayer(
                 # vocab_size, embd_size, ans_size, max_story_len,
                 vocab_size = self.config.mem_nn.vocab_size,
@@ -53,10 +69,7 @@ class MemoNet(Pythia):
                 max_story_len = self.config.mem_nn.max_story_len,
             )
             self.MNs.append(self.MN)
-            self.FCs.append(torch.nn.Linear(2048,512))
-
         self.MNs=nn.ModuleList(self.MNs)
-        self.FCs=nn.ModuleList(self.FCs)     
 
     def process_feature_embedding(
         self, attr, sample_list, text_embedding_total, extra=None, batch_size_t=None
@@ -81,31 +94,11 @@ class MemoNet(Pythia):
             feature = getattr(sample_list, f"{attr}_feature_{feature_idx:d}", None)
             if feature is None:
                 break
-            # print("feature_idx", feature_idx)
-            # print("feature1", feature.size()) # torch.Size([4, 100/196, 2048])
             feature_idx += 1
             feature = feature[:batch_size_t]
-            # print("feature2", feature.size())
             features.append(feature)
 
         feature_encoders = getattr(self, attr + "_feature_encoders")
-
-        # print("=====feat encoding=====")
-        # print("feat_encoders", feature_encoders)
-        '''
-        feat_encoders ModuleList(
-            (0): ImageFeatureEncoder(
-                (module): FinetuneFasterRcnnFpnFc7(
-                (lc): Linear(in_features=2048, out_features=2048, bias=True)
-                )
-            )
-            (1): ImageFeatureEncoder(
-                (module): Identity()
-            )
-        )
-
-        '''
-
         # Each feature should have a separate image feature encoders
         assert len(features) == len(feature_encoders), (
             "Number of feature encoders, {} are not equal "
@@ -117,8 +110,8 @@ class MemoNet(Pythia):
             # Get info related to the current feature. info is generally
             # in key of format "image_info_0" for 0th feature
             feature_info = getattr(sample_list, f"{attr}_info_{i:d}", {})
-            # print("feature_i: ", i, feature.size())   # torch.Size([4, 100/196, 2048])
-            # print("feature_info", feature_info)  # {}
+            # print("feature_i: ", i, feature.size())
+            # print("feature_info", feature_info)
             
             # For Pythia, we need max_features to mask attention
             feature_dim = getattr(feature_info, "max_features", None)
@@ -135,26 +128,12 @@ class MemoNet(Pythia):
             # Encode the features
             encoded_feature = feature_encoder(feature)
 
-            print("encoded_feat:", i, encoded_feature.size()) # torch.Size([64, 100, 2048])
+            # print("encoded_feat:", encoded_feature.size()) # torch.Size([64, 100, 2048])
             # print("=====feat_embedding===== ")
 
             # Get all of the feature embeddings
             list_attr = attr + "_feature_embeddings_list"
             feature_embedding_models = getattr(self, list_attr)[i]  # image_feature_embeddings_list
-
-            # RESIZE features 2048-512
-            linear_weight = self.FCs[i].weight.t() # [2048, 512]
-            # print("linear_weight", linear_weight.size())
-            linear_bias = self.FCs[i].bias # [512]
-            # print("linear_bias", linear_bias.size())
-            # encoded_feature_512_1 = encoded_feature.view(encoded_feature.size(0)*encoded_feature.size(1), -1) # [bs*196, 2048]
-            # print("feat 512_1", encoded_feature_512_1.size())
-            # encoded_feature_512_2 = torch.mm(encoded_feature_512_1, linear_weight) + linear_bias # [bs*196, 512]
-            # print("feat 512_2", encoded_feature_512_2.size())
-            # encoded_feature_512 = encoded_feature_512_2.view(encoded_feature.size(0), encoded_feature.size(1), -1)
-            # print("feat 512_3", encoded_feature_512.size())
-            encoded_feature_512 = (torch.mm(( encoded_feature.view(encoded_feature.size(0)*encoded_feature.size(1), -1)), linear_weight) + linear_bias).view(encoded_feature.size(0), encoded_feature.size(1), -1)
-
 
             # Forward through these embeddings one by one
             for feature_embedding_model in feature_embedding_models:
@@ -165,30 +144,27 @@ class MemoNet(Pythia):
                 # print(text_embedding_total.size())
 
                 embedding, attention = feature_embedding_model(*inp)
-                memo = self.MNs[i](encoded_feature, text_embedding_total)  # torch.Size([bs, 2048])
-                # memo = self.MNs[i](encoded_feature_512, text_embedding_total)  # torch.Size([bs, 2048])
-                # print("memo:", memo.size())  
-                # print("embedding", embedding.size())
+                memo = self.MNs[i](encoded_feature, text_embedding_total)  # torch.Size([64, 2048])
+                # print("memo:", memo.size())
 
                 embedding_memo_superpos = embedding + memo
                 feature_embeddings.append(embedding_memo_superpos)
-                # feature_embeddings.append(memo)
 
         # Concatenate all features embeddings and return along with attention
         feature_embedding_total = torch.cat(feature_embeddings, dim=1)
 
-        # print("feature_embeddings_tot", feature_embedding_total.size()) #[bs*4096]
+        # print("feature_embeddings_tot", feature_embedding_total.size())
 
         return feature_embedding_total, feature_attentions    
 
     def get_optimizer_parameters(self, config):
+        # combine_layer = self.MN
         combine_layer = self.image_text_multi_modal_combine_layer
         params = [
             {"params": self.word_embedding.parameters()},
             {"params": self.image_feature_embeddings_list.parameters()},
             {"params": self.text_embeddings.parameters()},
             {"params": self.MNs.parameters()},
-            {"params": self.FCs.parameters()},
             {"params": combine_layer.parameters()},
             {"params": self.classifier.parameters()},
             {
@@ -199,8 +175,13 @@ class MemoNet(Pythia):
 
         return params
 
+    '''post_MN
+    # def _get_classifier_input_dim(self):
+    #     return self.MN.out_dim
+    '''
+
     def forward(self, sample_list):
-        # torch.cuda.set_device(0)
+
         # print ("=====sample_list=====")
         # print(sample_list.fields())
         # for key in sample_list.keys():
@@ -224,6 +205,7 @@ class MemoNet(Pythia):
         if self.inter_model is not None:
             image_embedding_total = self.inter_model(image_embedding_total)
         
+        # pythia
         # print("image_embedding", image_embedding_total.size()) # [batch*4096]
         # print("text_embedding:" , image_embedding_total.size()) # [batch*4096]
         # print("=====combine layer=====")
@@ -242,3 +224,21 @@ class MemoNet(Pythia):
 
         return model_output
 
+
+        '''
+        # post_MN
+        image_embedding_total = image_embedding_total.unsqueeze(2)
+
+        # print("img_embedding_unsequeeze")
+        # print(image_embedding_total.size())
+
+        # model_output = {"scores": self.process_MN(image_embedding_total, text_embedding_total)}
+        
+        joint_embedding = self.process_MN(image_embedding_total, text_embedding_total)
+        # print("joint_emb", joint_embedding.size())
+        model_output = {"scores": self.calculate_logits(joint_embedding)}
+
+        # print("score:", model_output['scores'].size())
+
+        return model_output
+        '''

@@ -2,6 +2,7 @@
 import copy
 
 import torch
+import numpy as np
 from mmf.common.registry import registry
 from mmf.models.base_model import BaseModel
 from mmf.modules.embeddings import (
@@ -79,6 +80,8 @@ class Pythia(BaseModel):
         feature_dim = self.config[attr + "_feature_dim"]
         setattr(self, attr + "_feature_dim", feature_dim)
 
+        # print("feat_encoders_list_config", feat_encoders_list_config)
+
         for feat_encoder in feat_encoders_list_config:
             encoder_type = feat_encoder.type
             encoder_kwargs = copy.deepcopy(feat_encoder.params)
@@ -97,18 +100,28 @@ class Pythia(BaseModel):
         feature_embeddings_list = []
         num_feature_feat = len(getattr(self.config, f"{attr}_feature_encodings"))
 
+        # print("num_feature_feat", num_feature_feat)
+        # print(getattr(self.config, f"{attr}_feature_encodings"))
+        # [{'type': 'finetune_faster_rcnn_fpn_fc7', 'params': {'bias_file': 'models/detectron.defaults/fc7_b.pkl', 'weights_file': 'models/detectron.defaults/fc7_w.pkl', 'model_data_dir': '/media/ubuntu/MyDisk/data_mmf/vg'}}, {'type': 'default', 'params': {'model_data_dir': '/media/ubuntu/MyDisk/data_mmf/vg'}}]
+
         self.feature_embeddings_out_dim = 0
 
-        for _ in range(num_feature_feat):
+        for _ in range(num_feature_feat): #2
             feature_embeddings = []
             feature_attn_model_list = self.config[attr + "_feature_embeddings"]
 
+            # print ("feature_attn_model_list", feature_attn_model_list)
+            # # [{'modal_combine': {'type': 'non_linear_element_multiply', 'params': {'dropout': 0, 'hidden_dim': 5000}}, 'normalization': 'softmax', 'transform': {'type': 'linear', 'params': {'out_dim': 1}}}]
+            # print("attr_feat_dim", getattr(self, attr + "_feature_dim")) #2048
+            # print("text_embeddings_out_dim", self.text_embeddings_out_dim) # 2048
+
             for feature_attn_model_params in feature_attn_model_list:
                 feature_embedding = ImageFeatureEmbedding(
-                    getattr(self, attr + "_feature_dim"),
+                    getattr(self, attr + "_feature_dim"),  #2048
                     self.text_embeddings_out_dim,
                     **feature_attn_model_params,
                 )
+                # print ("feature_embedding", feature_embedding) #a embedding model
                 feature_embeddings.append(feature_embedding)
                 self.feature_embeddings_out_dim += feature_embedding.out_dim
 
@@ -155,7 +168,7 @@ class Pythia(BaseModel):
     def _init_classifier(self, combined_embedding_dim):
         # TODO: Later support multihead
         num_choices = registry.get(self._datasets[0] + "_num_final_outputs")
-
+        # print (num_choices)
         self.classifier = ClassifierLayer(
             self.config.classifier.type,
             in_dim=combined_embedding_dim,
@@ -188,24 +201,45 @@ class Pythia(BaseModel):
     def process_text_embedding(
         self, sample_list, embedding_attr="text_embeddings", info=None
     ):
+
+        print("=====text embedding=====")
+
         text_embeddings = []
 
         # Get "text" attribute in case of "text_embeddings" case
         # and "context" attribute in case of "context_embeddings"
         texts = getattr(sample_list, embedding_attr.split("_")[0])
 
+        # print("text", texts.size())  # bs*20*300
+
         # Get embedding models
         text_embedding_models = getattr(self, embedding_attr)
 
         for text_embedding_model in text_embedding_models:
+            # print("text_model", text_embedding_model)
+            '''
+            text_model TextEmbedding(
+                (module): AttentionTextEmbedding(
+                    (recurrent_unit): LSTM(300, 1024, batch_first=True)
+                    (dropout): Dropout(p=0, inplace=False)
+                    (conv1): Conv1d(1024, 512, kernel_size=(1,), stride=(1,))
+                    (conv2): Conv1d(512, 2, kernel_size=(1,), stride=(1,))
+                    (relu): ReLU()
+                )
+            )
+            '''
             # TODO: Move this logic inside
             if isinstance(text_embedding_model, PreExtractedEmbedding):
                 embedding = text_embedding_model(sample_list.question_id)
             else:
                 embedding = text_embedding_model(texts)
+
+            print("text_embedding: ", embedding.size()) 
+            # torch.Size([4(bs), 2048])
             text_embeddings.append(embedding)
 
         text_embeddding_total = torch.cat(text_embeddings, dim=1)
+        print("text_embedding_tot: ", text_embeddding_total.size()) # torch.Size([4(bs), 2048])
 
         return text_embeddding_total
 
@@ -225,6 +259,7 @@ class Pythia(BaseModel):
         extra = sample_list.get_fields(extra)
 
         feature_idx = 0
+        # print("=====feature encoder=====")
 
         # Get all of the features, which are in the form, "image_feature_0"
         # "image_feature_1" ...
@@ -248,34 +283,69 @@ class Pythia(BaseModel):
             # Get info related to the current feature. info is generally
             # in key of format "image_info_0" for 0th feature
             feature_info = getattr(sample_list, f"{attr}_info_{i:d}", {})
+            # print("feature_i: ", i, feature.size())
+            # print("feature_info", feature_info)
+            
             # For Pythia, we need max_features to mask attention
             feature_dim = getattr(feature_info, "max_features", None)
             if feature_dim is not None:
                 feature_dim = feature_dim[:batch_size_t]
 
+            # print("feat_dim", feature_dim)  # none
+
             # Attribute in which encoders are saved, for "image" it
             # will be "image_feature_encoders", other example is
             # "context_feature_encoders"
             encoders_attr = attr + "_feature_encoders"
-            feature_encoder = getattr(self, encoders_attr)[i]
+            feature_encoder = getattr(self, encoders_attr)[i]   #repeat of line 271
+            # print("feature_encoder", feature_encoder)
+            '''
+            feature_i:  0 torch.Size([64, 100, 2048])
+            feature_info {}
+            feature_encoder ImageFeatureEncoder(
+            (module): FinetuneFasterRcnnFpnFc7(
+                (lc): Linear(in_features=2048, out_features=2048, bias=True)
+            )
+            )
+            feature_i:  1 torch.Size([64, 196, 2048])
+            feature_info {}
+            feature_encoder ImageFeatureEncoder(
+            (module): Identity()
+            )
+            '''
 
             # Encode the features
             encoded_feature = feature_encoder(feature)
 
+            # print("encoded_feat:", encoded_feature.size()) # torch.Size([64, 100, 2048])
+            # print("=====feat_embedding", i, "===== ")
+
             # Get all of the feature embeddings
             list_attr = attr + "_feature_embeddings_list"
-            feature_embedding_models = getattr(self, list_attr)[i]
+            feature_embedding_models = getattr(self, list_attr)[i]  # image_feature_embeddings_list
 
             # Forward through these embeddings one by one
             for feature_embedding_model in feature_embedding_models:
                 inp = (encoded_feature, text_embedding_total, feature_dim, extra)
+                # torch.Size([64, 100, 2048]), [64,2048], none, samplelist()
+                # print(feature_embedding_model)
+                # print(encoded_feature.size())
+                # print(text_embedding_total.size())
 
                 embedding, attention = feature_embedding_model(*inp)
                 feature_embeddings.append(embedding)
                 feature_attentions.append(attention.squeeze(-1))
 
+                print("feature_embeddings_&_attns")
+                print(embedding.size())  # torch.Size([64, 2048])
+                print(attention.size()) # torch.Size([64, 196, 1])
+
         # Concatenate all features embeddings and return along with attention
         feature_embedding_total = torch.cat(feature_embeddings, dim=1)
+
+        # print("feature_embeddings_tot")
+        # print(feature_embedding_total.size())
+
         return feature_embedding_total, feature_attentions
 
     def combine_embeddings(self, *args):
@@ -289,6 +359,30 @@ class Pythia(BaseModel):
         return self.classifier(joint_embedding)
 
     def forward(self, sample_list):
+        print ("=====sample_list=====")
+        print(sample_list.fields())
+        for key in sample_list.keys():
+            print(key+":")
+            # print(type(sample_list[key]))
+            if isinstance(sample_list[key],str) :
+                print("str:", sample_list[key])
+            elif isinstance(sample_list[key],dict) : # region description: dict
+                for key2 in sample_list[key].keys():
+                    print("    "+key2+":")
+                    # if type(sample_list[key][key2]) is np.ndarray:
+                    #     print(sample_list[key][key2].shape)
+                    # else:
+                    #     print(sample_list[key][key2])
+                    print(sample_list[key][key2])
+            elif isinstance(sample_list[key],list) :
+                for i in sample_list[key]:  # image info 1: [none, ]
+                    if i != None:
+                        print(i.keys(), i.values)
+                    else: 
+                        print (i)
+            else: 
+                print(sample_list[key].size())
+
         sample_list.text = self.word_embedding(sample_list.text)
         text_embedding_total = self.process_text_embedding(sample_list)
 
@@ -299,12 +393,19 @@ class Pythia(BaseModel):
         if self.inter_model is not None:
             image_embedding_total = self.inter_model(image_embedding_total)
 
+        # print("image_embedding", image_embedding_total.size())  # [batch*4096]
+        # print("text_embedding:" , text_embedding_total.size())  # [batch*?]
+        # print("=====combine layer=====")
+
         joint_embedding = self.combine_embeddings(
             ["image", "text"], [image_embedding_total, text_embedding_total]
         )
 
+        # print("joint_embedding:", joint_embedding.size()) # [batch*5000]
+
         model_output = {"scores": self.calculate_logits(joint_embedding)}
 
+        # print("model_output:", model_output['scores'].size()) # [64, 3129]
         return model_output
 
 
