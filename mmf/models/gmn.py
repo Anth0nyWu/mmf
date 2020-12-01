@@ -10,6 +10,13 @@ from mmf.modules.embeddings import (
     TextEmbedding,
 )
 from mmf.modules.layers import MemNNLayer
+from mmf.modules.layers import EdgeLayer
+from mmf.modules.layers import NodeLayer
+from mmf.modules.layers import GlobalLayer
+from mmf.modules.layers import GraphMemoryLayer
+from mmf.modules.fusions import MCB
+from torch_scatter import scatter_mean
+from torch_geometric.nn import MetaLayer
 from torch import nn
 import cv2
 
@@ -31,16 +38,26 @@ class GraphMemoNet(Pythia):
         self._init_text_embeddings("text")
         self._init_feature_encoders("image")
         self._init_feature_embeddings("image")
-        # self._init_MN("image")
+        self._init_GMN()
+        self._init_MCB()
         self._init_combine_layer("image", "text")
         self._init_classifier(self._get_classifier_input_dim())
         self._init_extras()
 
-    # def normalize_bbox()
-    # def bbox_top_left_h_w_to_top_left_bottom_right(bbox_list, image_list):
-    #     top_left_x = bbox_list[1]
-    #     top_left_y = bbox_list[2]
-    #     bottom_down_x = bbox_list[]
+    def _init_GMN():
+        self.visual_edge_model = EdgeModel()
+        self.visual_node_model = NodeModel()
+        self.visual_global_model = GlobalModel()
+        self.visual_graph = Metalayer(visual_edge_model, visual_node_model, visual_global_model)
+        self.textual_edge_model = EdgeModel()
+        self.textual_node_model = NodeModel()
+        self.textual_global_model = GlobalModel()
+        self.textual_graph = Metalayer(textual_edge_model, textual_node_model, textual_global_model)
+        # self.memory = 
+    def _init_MCB():
+        self.mcb = MCB()
+
+
 
     def process_text_embedding(
         self, sample_list, embedding_attr="text_embeddings", info=None
@@ -183,19 +200,19 @@ class GraphMemoNet(Pythia):
 
         # print("=====feat encoding=====")
         # print("feat_encoders", feature_encoders)
-        '''
-        feat_encoders ModuleList(
-            (0): ImageFeatureEncoder(
-                (module): FinetuneFasterRcnnFpnFc7(
-                (lc): Linear(in_features=2048, out_features=2048, bias=True)
-                )
-            )
-            (1): ImageFeatureEncoder(
-                (module): Identity()
-            )
-        )
+        # result: 
+        # feat_encoders ModuleList(
+        #     (0): ImageFeatureEncoder(
+        #         (module): FinetuneFasterRcnnFpnFc7(
+        #         (lc): Linear(in_features=2048, out_features=2048, bias=True)
+        #         )
+        #     )
+        #     (1): ImageFeatureEncoder(
+        #         (module): Identity()
+        #     )
+        # )
 
-        '''
+ 
 
         # Each feature should have a separate image feature encoders
         assert len(features) == len(feature_encoders), (
@@ -227,15 +244,20 @@ class GraphMemoNet(Pythia):
 
             print("encoded_feat:", i, encoded_feature.size()) # torch.Size([64, 100, 2048])
             #feature1--finetune; feat2--identity
-            print("=====feat_embedding===== ")
+        
+        print("=====feat_embedding===== ")
+        # Forward through these embeddings one by one
+        # current data: encoded_feature[0,1], text_embedding_total, embedding_phrase total, feature_dim, extra, bbox_phrase, bbox_feature
+        for i in range(bs):
+            visual_nodes = 
+            visual_edges = 
+            textual_nodes = 
+            textual_edges = 
+        
 
-            # Get all of the feature embeddings
-            list_attr = attr + "_feature_embeddings_list"
-            feature_embedding_models = getattr(self, list_attr)[i]  # image_feature_embeddings_list
 
-            # Forward through these embeddings one by one
-            for feature_embedding_model in feature_embedding_models:
-                inp = (encoded_feature, text_embedding_total, feature_dim, extra)
+            # for feature_embedding_model in feature_embedding_models:
+            #     inp = (encoded_feature, text_embedding_total, feature_dim, extra)
                 # torch.Size([64, 100, 2048]), [64,2048], none, samplelist()
                 # print(feature_embedding_model) #attn & identity as listed in yml
                 # print(encoded_feature.size())
@@ -243,7 +265,7 @@ class GraphMemoNet(Pythia):
                 # print("erxtra", extra) # infos in samplelist with key extra 
 
                 # embedding, attention = feature_embedding_model(*inp)
-                out = self.GMNs[i](encoded_feature, text_embedding_total, embedding_phrase_total, )
+                # out = self.GMNs[i](encoded_feature, text_embedding_total, embedding_phrase_total, )
                 # memo = self.MNs[i](encoded_feature, text_embedding_total, embedding_phrase_total)  # torch.Size([bs, 2048])
                 # memo = self.MNs[i](encoded_feature_512, text_embedding_total)  # torch.Size([bs, 2048])
                 # print("memo:", memo.size())  
@@ -278,7 +300,7 @@ class GraphMemoNet(Pythia):
 
     #     return params
 
-    def adjcent(bbox1, bbox2):
+    def is_adjcent(bbox1, bbox2):
         d_ecu_convert = (bbox1[0]+bbox1[2]-bbox2[0]-bbox2[2])*(bbox1[0]+bbox1[2]-bbox2[0]-bbox2[2])+(bbox1[1]+bbox1[3]-bbox2[1]-bbox2[3])*(bbox1[1]+bbox1[3]-bbox2[1]-bbox2[3])
         adj = (d_ecu_convert<1.0)
         return adj

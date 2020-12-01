@@ -11,6 +11,7 @@ from torch.nn.utils.weight_norm import weight_norm
 from torch.nn import Sequential as Seq, Linear as Lin, ReLU
 from torch_scatter import scatter_mean
 from torch_geometric.nn import MetaLayer
+from mmf.modules.fusions import MCB
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -788,9 +789,9 @@ class AttnPool1d(nn.Module):
 # TODO 
 
 class EdgeModel(nn.Module):
-    def __init__(self):
+    def __init__(self, num_nodes):
         super(EdgeModel, self).__init__()
-        self.edge_mlp = Seq(Lin(..., ...), ReLU(), Lin(..., ...))
+        self.edges = zeros()
 
     def forward(self, src, dest, edge_attr, u, batch):
         # source, target: [E, F_x], where E is the number of edges.
@@ -801,7 +802,7 @@ class EdgeModel(nn.Module):
         return self.edge_mlp(out)
 
 class NodeModel(nn.Module):
-    def __init__(self):
+    def __init__(self, nodes):
         super(NodeModel, self).__init__()
         self.node_mlp_1 = Seq(Lin(..., ...), ReLU(), Lin(..., ...))
         self.node_mlp_2 = Seq(Lin(..., ...), ReLU(), Lin(..., ...))
@@ -969,6 +970,7 @@ class MemNNLayer(nn.Module):
 
         return u
         # return out
+        # return value is weighted features or softmax of it
 
         # return F.log_softmax(out, -1)
 
