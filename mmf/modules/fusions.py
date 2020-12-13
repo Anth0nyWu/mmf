@@ -619,7 +619,7 @@ class MCB(nn.Module):
         self,
         input_dims,
         output_dim,
-        mm_dim=16000,
+        mm_dim=8000, # 16000,
         activ_output="relu",
         dropout_output=0.0,
     ):

@@ -160,9 +160,9 @@ class MemoNet(Pythia):
             for feature_embedding_model in feature_embedding_models:
                 inp = (encoded_feature, text_embedding_total, feature_dim, extra)
                 # torch.Size([64, 100, 2048]), [64,2048], none, samplelist()
-                # print(feature_embedding_model)
-                # print(encoded_feature.size())
-                # print(text_embedding_total.size())
+                print(feature_embedding_model)
+                print(encoded_feature.size())
+                print(text_embedding_total.size())
 
                 embedding, attention = feature_embedding_model(*inp)
                 memo = self.MNs[i](encoded_feature, text_embedding_total)  # torch.Size([bs, 2048])
@@ -177,7 +177,7 @@ class MemoNet(Pythia):
         # Concatenate all features embeddings and return along with attention
         feature_embedding_total = torch.cat(feature_embeddings, dim=1)
 
-        # print("feature_embeddings_tot", feature_embedding_total.size()) #[bs*4096]
+        print("feature_embeddings_tot", feature_embedding_total.size()) #[bs*4096]
 
         return feature_embedding_total, feature_attentions    
 

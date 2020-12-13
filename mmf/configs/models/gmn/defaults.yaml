@@ -17,8 +17,9 @@ model_config:
     text_embeddings:
     - type: bilstm
       params:
-        hidden_dim: 1280
-        out_dim: 2048 
+        hidden_dim: 2048
+        # ??? out put size = hidden_dim
+        out_dim: 2048
         # vocab_size: 1280
         embedding_dim: 300
         num_layers: 1
@@ -39,7 +40,7 @@ model_config:
         type: linear
         params:
           out_dim: 1
-    image_feature_dim: 2048
+    image_feature_dim: 2048 # 2048
 
     image_feature_encodings:
     - type: finetune_faster_rcnn_fpn_fc7
@@ -71,3 +72,7 @@ model_config:
       embd_size: 70
       vocab_size: 2048 # fix 2048
       ans_size: 300
+    mcb:
+      visual_input_dim: 2048 # 2048
+      textual_input_dim: 2048 # 2048
+      output_dim: 2048 # 1024

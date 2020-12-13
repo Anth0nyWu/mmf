@@ -8,10 +8,9 @@ from mmf.modules.decoders import LanguageDecoder
 from torch import nn
 from torch.nn.utils.weight_norm import weight_norm
 
-from torch.nn import Sequential as Seq, Linear as Lin, ReLU
-from torch_scatter import scatter_mean
-from torch_geometric.nn import MetaLayer
-from mmf.modules.fusions import MCB
+# from torch.nn import Sequential as Seq, Linear as Lin, ReLU
+# from torch_scatter import scatter_mean
+# from torch_geometric.nn import MetaLayer
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -974,5 +973,134 @@ class MemNNLayer(nn.Module):
 
         # return F.log_softmax(out, -1)
 
+class GraphLayer(nn.Module):
+    def __init__(self, attr, hidden_dim, node_dim, edge_dim):
+            from mmf.modules.embeddings import BiLSTMTextEmbedding
+            super( GraphLayer, self ).__init__() 
+            # self.phi_e = BiLSTMTextEmbedding( 
+            #     hidden_dim = 2048,
+            #     embedding_dim = 300,
+            #     num_layers = 1,
+            #     dropout = 0.0,
+            #     out_dim = 2048
+            #     )
+            # self.phi_v = BiLSTMTextEmbedding( 
+            #     hidden_dim = 2048,
+            #     embedding_dim = 300,
+            #     num_layers = 1,
+            #     dropout = 0.0,
+            #     out_dim = 2048
+            #     )
+            # self.phi_u = BiLSTMTextEmbedding( 
+            #     hidden_dim = 2048,
+            #     embedding_dim = 300,
+            #     num_layers = 1,
+            #     dropout = 0.0,
+            #     out_dim = 2048
+            #     )
+            # self.phi_e = nn.GRU(input_size=2048, hidden_size=2048, batch_first=True)
+            # self.phi_v = nn.GRU(input_size=2048, hidden_size=2048, batch_first=True)
+            # self.phi_u = nn.GRU(input_size=2048, hidden_size=2048, batch_first=True)
+            # self.phi_e = nn.GRUCell(input_size=2048, hidden_size=2048)
+            self.phi_e = myGRU(2048,2048)
+            self.phi_v = myGRU(2048,2048)
+            self.phi_u = myGRU(2048,2048)
+
+            self.W1 = nn.Parameter(torch.Tensor(hidden_dim, node_dim))
+            self.b1 = nn.Parameter(torch.Tensor(hidden_dim))
+            self.W2 = nn.Parameter(torch.Tensor(hidden_dim, node_dim))
+            self.b2 = nn.Parameter(torch.Tensor(hidden_dim))
+            self.W3 = nn.Parameter(torch.Tensor(hidden_dim, edge_dim))
+            self.b3 = nn.Parameter(torch.Tensor(hidden_dim))
+            self.W4 = nn.Parameter(torch.Tensor(hidden_dim, edge_dim))
+            self.b4 = nn.Parameter(torch.Tensor(hidden_dim))
+
+    def rho_vu(self, node_features, W1, W2, b1, b2):
+        out = torch.zeros(len(b1)).cuda(0)
+        for i in node_features :
+            out = torch.add(out, (torch.sigmoid(torch.add(torch.mm(W1, i.unsqueeze(1)).squeeze(1), b1))*torch.tanh(torch.add(torch.mm(W2, i.unsqueeze(1)).squeeze(1), b2))))
+            # more simple torch.sum()
+        return torch.tanh(out)
+
+    def rho_eu(self, edge_features, W1, W2, b1, b2):
+        out = torch.zeros(len(b1)).cuda(0)
+        for i in edge_features :
+            # a = torch.sigmoid(torch.add(torch.mm(W1, i.unsqueeze(1)).squeeze(1), b1))
+            # b = torch.tanh(torch.add(torch.mm(W2, i.unsqueeze(1)).squeeze(1), b2))
+            # print(a.size(), b.size())
+            out = torch.add(out, (torch.sigmoid(torch.add(torch.mm(W1, i.unsqueeze(1)).squeeze(1), b1))*torch.tanh(torch.add(torch.mm(W2, i.unsqueeze(1)).squeeze(1), b2))))
+            # more simple torch.sum()
+        return torch.tanh(out)
+
+    def rho_ev(self, edge_features_adj):
+        return torch.sum(edge_features_adj, dim = 0)
 
 
+    def forward(self, node_features, edge_ends, edge_features, global_features):
+        aa =  node_features
+        bb = edge_features
+        cc = global_features
+        num_edges = len(edge_ends) #5554, kilos of edges
+        num_nodes = len(node_features)
+        # print(num_edges) #5554, kilos of edges
+        # print(len(edge_ends[0]))  # 2, 2 nodes
+        # print(type(node_features), type(edge_features), type(global_features))
+        # print(len(node_features), len(edge_features), len(global_features)) # 100 5554 196
+        # print(node_features[0].size(), edge_features[0].size(), global_features[0].size()) # torch size 2048
+        # node_features = torch.cat(node_features, dim = 0)
+        # edge_features = torch.cat(edge_features, dim = 0)
+        # print(node_features.size(), edge_features.size(), global_features.size())
+
+        for i in range(num_edges): # i-th edge
+            # compute new edge
+            # print(edge_ends[i])
+            # print(edge_features[i].unsqueeze(0).size(), node_features[edge_ends[i][0]].unsqueeze(0).size(), global_features.size())       
+            gru_input_e = torch.cat((node_features[edge_ends[i][0]].unsqueeze(0), node_features[edge_ends[i][1]].unsqueeze(0) ),  dim = 0) # cat global
+            gru_hidden_e = edge_features[i].unsqueeze(0).unsqueeze(0) #.cuda(0)
+            # print(gru_input.size(), gru_hidden.size())
+            gru_out_e, gru_hidnew_e = self.phi_e(gru_input_e.unsqueeze(0), gru_hidden_e)
+            edge_features[i] = gru_hidnew_e.squeeze(0).squeeze(0)
+        
+        for j in range (num_nodes): # j-th node
+            edge_features_adj = []
+            for i in range(num_edges):
+                if (edge_ends[i][0] == j):
+                    edge_features_adj.append(edge_features[i].unsqueeze(0))
+            edge_features_adj = torch.cat(edge_features_adj, dim = 0)
+            # print("edge_feat_adj", edge_features_adj.size())
+            aggr_edge_adj = self.rho_ev(edge_features_adj)
+            gru_input_v = edge_features_adj.unsqueeze(0)#.unsqueeze(0)# .cuda(0) # cat global
+            gru_hidden_v = node_features[j].unsqueeze(0).unsqueeze(0)
+            # print(gru_input_v.size(), gru_hidden_v.size())
+            # gru_out_v, gru_hidnew_v = self.phi_v(gru_input_v, gru_hidden_v)
+            gru_out_v, gru_hidnew_v = gru_input_v, gru_hidden_v
+            node_features[j] = gru_hidnew_v.squeeze(0).squeeze(0)
+
+        aggr_edge_total = self.rho_eu(edge_features, self.W3, self.W4, self.b3, self.b4)
+        aggr_node_total = self.rho_vu(node_features, self.W1, self.W2, self.b1, self.b2)
+        gru_hidden_u = global_features.unsqueeze(0).unsqueeze(0)
+        gru_input_u = torch.cat((aggr_edge_total.unsqueeze(0), aggr_node_total.unsqueeze(0)), dim = 0)
+        # print(gru_input_u.size(), gru_hidden_u.size())
+        # gru_out_u, gru_hidnew_u = self.phi_u(gru_input_u.unsqueeze(0), gru_hidden_u)
+        gru_out_u, gru_hidnew_u = gru_input_u.unsqueeze(0), gru_hidden_u
+        global_features = gru_hidnew_u.squeeze(0).squeeze(0)
+
+        return node_features, edge_features, global_features
+        # return aa, bb, cc
+
+class myGRU(nn.Module):
+    def __init__(self, embedding_dim, hidden_dim):
+        super( myGRU, self ).__init__() 
+        self.rnn = nn.GRU(input_size = embedding_dim,  hidden_size = hidden_dim, batch_first=True)
+        
+    def init_hidden(self, init):
+        # 开始时刻, 没有隐状态
+        # 关于维度设置的详情,请参考 Pytorch 文档
+        # 各个维度的含义是 (Seguence, minibatch_size, hidden_dim)
+        return init
+    def forward(self, x ,y):
+        # 
+        self.hidden = self.init_hidden(y)  # !!!
+        out1, self.hidden_out = self.rnn(x,self.hidden)     
+        # 
+        return out1, self.hidden_out
