@@ -998,13 +998,13 @@ class GraphLayer(nn.Module):
             #     dropout = 0.0,
             #     out_dim = 2048
             #     )
-            # self.phi_e = nn.GRU(input_size=2048, hidden_size=2048, batch_first=True)
-            # self.phi_v = nn.GRU(input_size=2048, hidden_size=2048, batch_first=True)
-            # self.phi_u = nn.GRU(input_size=2048, hidden_size=2048, batch_first=True)
+            self.phi_e = nn.GRU(input_size=2048, hidden_size=2048, batch_first=True)
+            self.phi_v = nn.GRU(input_size=2048, hidden_size=2048, batch_first=True)
+            self.phi_u = nn.GRU(input_size=2048, hidden_size=2048, batch_first=True)
             # self.phi_e = nn.GRUCell(input_size=2048, hidden_size=2048)
-            self.phi_e = myGRU(2048,2048)
-            self.phi_v = myGRU(2048,2048)
-            self.phi_u = myGRU(2048,2048)
+            # self.phi_e = myGRU(2048,2048)
+            # self.phi_v = myGRU(2048,2048)
+            # self.phi_u = myGRU(2048,2048)
 
             self.W1 = nn.Parameter(torch.Tensor(hidden_dim, node_dim))
             self.b1 = nn.Parameter(torch.Tensor(hidden_dim))
@@ -1057,8 +1057,9 @@ class GraphLayer(nn.Module):
             # print(edge_features[i].unsqueeze(0).size(), node_features[edge_ends[i][0]].unsqueeze(0).size(), global_features.size())       
             gru_input_e = torch.cat((node_features[edge_ends[i][0]].unsqueeze(0), node_features[edge_ends[i][1]].unsqueeze(0) ),  dim = 0) # cat global
             gru_hidden_e = edge_features[i].unsqueeze(0).unsqueeze(0) #.cuda(0)
-            # print(gru_input.size(), gru_hidden.size())
+            # print("gru1 in", gru_input_e.size(), gru_hidden_e.size())
             gru_out_e, gru_hidnew_e = self.phi_e(gru_input_e.unsqueeze(0), gru_hidden_e)
+            # print("gru1 out", gru_out_e.size(), gru_hidnew_e.size())
             edge_features[i] = gru_hidnew_e.squeeze(0).squeeze(0)
         
         for j in range (num_nodes): # j-th node
@@ -1069,11 +1070,13 @@ class GraphLayer(nn.Module):
             edge_features_adj = torch.cat(edge_features_adj, dim = 0)
             # print("edge_feat_adj", edge_features_adj.size())
             aggr_edge_adj = self.rho_ev(edge_features_adj)
-            gru_input_v = edge_features_adj.unsqueeze(0)#.unsqueeze(0)# .cuda(0) # cat global
+            gru_input_v = aggr_edge_adj.unsqueeze(0)#.unsqueeze(0)# .cuda(0) # cat global
             gru_hidden_v = node_features[j].unsqueeze(0).unsqueeze(0)
-            # print(gru_input_v.size(), gru_hidden_v.size())
-            # gru_out_v, gru_hidnew_v = self.phi_v(gru_input_v, gru_hidden_v)
-            gru_out_v, gru_hidnew_v = gru_input_v, gru_hidden_v
+            # print("gru2 in", gru_input_v.size(), gru_hidden_v.size())
+            gru_out_v, gru_hidnew_v = self.phi_v(gru_input_v.unsqueeze(0), gru_hidden_v)
+            # gru_out_v, gru_hidnew_v = gru_input_v, gru_hidden_v
+            # print("gru2 out", gru_out_v.size(), gru_hidnew_v.size())
+            gru_hidnew_v.detach_()
             node_features[j] = gru_hidnew_v.squeeze(0).squeeze(0)
 
         aggr_edge_total = self.rho_eu(edge_features, self.W3, self.W4, self.b3, self.b4)
@@ -1081,8 +1084,9 @@ class GraphLayer(nn.Module):
         gru_hidden_u = global_features.unsqueeze(0).unsqueeze(0)
         gru_input_u = torch.cat((aggr_edge_total.unsqueeze(0), aggr_node_total.unsqueeze(0)), dim = 0)
         # print(gru_input_u.size(), gru_hidden_u.size())
-        # gru_out_u, gru_hidnew_u = self.phi_u(gru_input_u.unsqueeze(0), gru_hidden_u)
-        gru_out_u, gru_hidnew_u = gru_input_u.unsqueeze(0), gru_hidden_u
+        gru_out_u, gru_hidnew_u = self.phi_u(gru_input_u.unsqueeze(0), gru_hidden_u)
+        # gru_out_u, gru_hidnew_u = gru_input_u.unsqueeze(0), gru_hidden_u
+        gru_hidnew_u.detach_()
         global_features = gru_hidnew_u.squeeze(0).squeeze(0)
 
         return node_features, edge_features, global_features

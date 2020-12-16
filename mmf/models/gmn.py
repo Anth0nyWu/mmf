@@ -22,7 +22,7 @@ from mmf.modules.fusions import MCB
 from torch import nn
 import numpy as np
 import cv2
-
+torch.autograd.set_detect_anomaly(True)
 
 
 @registry.register_model("gmn")
@@ -358,7 +358,7 @@ class GraphMemoNet(MemoNet):
             {"params": self.text_embeddings.parameters()},
             {"params": self.mcb.parameters()},
             {"params": self.visual_graph.parameters()},
-            {"params": self.textual_graph.parameters()},
+            # {"params": self.textual_graph.parameters()},
             {"params": combine_layer.parameters()},
             {"params": self.classifier.parameters()},
             {
@@ -370,9 +370,8 @@ class GraphMemoNet(MemoNet):
         return params
 
     def forward(self, sample_list):
-        torch.autograd.set_detect_anomaly(True)
         # torch.cuda.set_device(0)
-        print ("=====sample_list=====")
+        # print ("=====sample_list=====")
         # print(sample_list.fields())
         # for key in sample_list.keys():
         #     print(key+":")
