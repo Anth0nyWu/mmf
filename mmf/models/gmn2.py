@@ -4,6 +4,7 @@ import torch
 from mmf.common.registry import registry
 from mmf.models.pythia import Pythia
 from mmf.models.memo_net import MemoNet
+from mmf.models.gmn import GraphMemoNet
 from mmf.modules.embeddings import (
     ImageFeatureEmbedding,
     MultiHeadImageFeatureEmbedding,
@@ -26,14 +27,14 @@ import cv2
 torch.autograd.set_detect_anomaly(True)
 
 
-@registry.register_model("gmn")
-class GraphMemoNet(MemoNet):
+@registry.register_model("gmn2")
+class GraphMemoNet2(GraphMemoNet):
     def __init__(self, config):
         super().__init__(config)
 
     @classmethod
     def config_path(cls):
-        return "configs/models/gmn/defaults.yaml"
+        return "configs/models/gmn2/defaults.yaml"
 
     def build(self):
         super().build()
