@@ -4,6 +4,7 @@ import torch
 from mmf.common.registry import registry
 from mmf.models.pythia import Pythia
 from mmf.models.memo_net import MemoNet
+from mmf.models.gmn import GraphMemoNet
 from mmf.modules.embeddings import (
     ImageFeatureEmbedding,
     MultiHeadImageFeatureEmbedding,
@@ -26,14 +27,14 @@ import cv2
 torch.autograd.set_detect_anomaly(True)
 
 
-@registry.register_model("gmn")
-class GraphMemoNet(MemoNet):
+@registry.register_model("gmn2")
+class GraphMemoNet2(Pythia):
     def __init__(self, config):
         super().__init__(config)
 
     @classmethod
     def config_path(cls):
-        return "configs/models/gmn/defaults.yaml"
+        return "configs/models/gmn2/defaults.yaml"
 
     def build(self):
         super().build()
@@ -72,11 +73,10 @@ class GraphMemoNet(MemoNet):
     # def _init_memo_layer(self, H, W): 
     #     self.memo_layer = MemoLayer()
 
-
+    """
     def process_text_embedding(
         self, sample_list, embedding_attr="text_embeddings", info=None
     ):
-
         # print("=====text embedding=====")
 
         #metadata
@@ -132,10 +132,10 @@ class GraphMemoNet(MemoNet):
         # print(len(embedding_phrase_total[0][0]))
 
         return text_embeddding_total, embedding_phrase_total
-
+    """
         
     def process_feature_embedding(
-        self, attr, sample_list, text_embedding_total, embedding_phrase_total, extra=None, batch_size_t=None
+        self, attr, sample_list, text_embedding_total, extra=None, batch_size_t=None
     ):
         if extra is None:
             extra = []
@@ -148,31 +148,17 @@ class GraphMemoNet(MemoNet):
         # print(batch_size_t)
 
         ## metadata
-        bs = len(sample_list.question_id) 
-        num_regions_vg = []
-        for i in range(bs):
-            num_regions_vg.append(len(sample_list.region_description["region_id"][i]))
+        # bs = len(sample_list.question_id) 
+        bs = batch_size_t
+        # num_regions_vg = []
+        # for i in range(bs):
+        #     num_regions_vg.append(len(sample_list.region_description["region_id"][i]))
 
         ## Convert list of keys to the actual values
         extra = sample_list.get_fields(extra)
         ## bboxes
-        bbox_phrase_width = sample_list.region_description["width"]
-        bbox_phrase_height = sample_list.region_description["height"]
-        bbox_phrase_x = sample_list.region_description["x"]
-        bbox_phrase_y = sample_list.region_description["y"]
-        bbox_phrase = [[] for i in range (bs)]
-        for i in range (bs):
-            for j in range (num_regions_vg[i]):
-                bbox_phrase[i].append([bbox_phrase_x[i][j], bbox_phrase_y[i][j], bbox_phrase_x[i][j]+bbox_phrase_width[i][j], bbox_phrase_y[i][j]+bbox_phrase_height[i][j]])
-        # bbox_phrase_width = torch.tensor(sample_list.region_description["width"]).cuda()
-        # bbox_phrase_height = torch.tensor(sample_list.region_description["height"]).cuda()
-        # bbox_phrase_x = torch.tensor(sample_list.region_description["x"]).cuda()
-        # bbox_phrase_y = torch.tensor(sample_list.region_description["y"]).cuda()
-        # bbox_phrase_x1 = torch.add(bbox_phrase_width, bbox_phrase_x)
-        # bbox_phrase_y1 = torch.add(bbox_phrase_height, bbox_phrase_y)
-        # bbox_phrase = torch.stack(bbox_phrase_x, bbox_phrase_y, bbox_phrase_x1, bbox_phrase_y1)
-        # print("bbox_phrase",bbox_phrase)
         bbox_feature = torch.tensor(sample_list.image_info_0["bbox"]).cuda()  # [bs, 100, 4]    
+
         # ====print img with bbox==========
         # for i in range (bs):
         #     img_src = sample_list.region_description["image_url"][i]
@@ -227,8 +213,6 @@ class GraphMemoNet(MemoNet):
         #         (module): Identity()
         #     )
         # )
-
- 
 
         # Each feature should have a separate image feature encoders
         assert len(features) == len(feature_encoders), (
@@ -298,25 +282,25 @@ class GraphMemoNet(MemoNet):
                 # visual_nodes[i] = VisualNodeModel(visual_node_features[i])
                 # visual_edges[i] = VisualEdgeModel()
 
-            ## textual graph init
-            # print(embedding_phrase_total[i]) # [1,4,50/49,2048]
-            embedding_phrase_total[0][i]=torch.cat(embedding_phrase_total[0][i], dim = 0)
-            # print("embedding_phrase_total", embedding_phrase_total[0][0].size())
-            # print("text_embedding_total", text_embedding_total[i].size())        
-            textual_node_features[i]= (embedding_phrase_total[0][i]*text_embedding_total[i]).unsqueeze(0) # [49, 2048] * [2048] =>[49,2048]
-            #  textual_node_features = torch.mmf(embedding_phrase_total,text_embedding_total)
-            # print("num_regions_vg", num_regions_vg[i], len(bbox_phrase[i]))
-            ## edge init
-            for j in range (num_regions_vg[i]):
-                # textual_node_features[i].append(multiply(embedding_phrase_total[i][j], text_embedding_total[i]))
-                for k in range (len(bbox_phrase[i])):
-                    if self.is_adjcent(bbox_phrase[i][j], bbox_phrase[i][k]):
-                        textual_edge_ends[i].append([j,k]) # [bs, num_edges, 2]
-                        textual_edge_features[i].append(torch.zeros(1,textual_edge_feat_dim))# [bs, num_edges, 2048]
-            textual_edge_features[i] = torch.cat(textual_edge_features[i]).cuda(0)
-            # textual_nodes[i] = TextualNodeModel(extual_node_features[i])
-            # textual_edges[i] = TextualEdgeModel()
-            #  
+            # ## textual graph init
+            # # print(embedding_phrase_total[i]) # [1,4,50/49,2048]
+            # embedding_phrase_total[0][i]=torch.cat(embedding_phrase_total[0][i], dim = 0)
+            # # print("embedding_phrase_total", embedding_phrase_total[0][0].size())
+            # # print("text_embedding_total", text_embedding_total[i].size())        
+            # textual_node_features[i]= (embedding_phrase_total[0][i]*text_embedding_total[i]).unsqueeze(0) # [49, 2048] * [2048] =>[49,2048]
+            # #  textual_node_features = torch.mmf(embedding_phrase_total,text_embedding_total)
+            # # print("num_regions_vg", num_regions_vg[i], len(bbox_phrase[i]))
+            # ## edge init
+            # for j in range (num_regions_vg[i]):
+            #     # textual_node_features[i].append(multiply(embedding_phrase_total[i][j], text_embedding_total[i]))
+            #     for k in range (len(bbox_phrase[i])):
+            #         if self.is_adjcent(bbox_phrase[i][j], bbox_phrase[i][k]):
+            #             textual_edge_ends[i].append([j,k]) # [bs, num_edges, 2]
+            #             textual_edge_features[i].append(torch.zeros(1,textual_edge_feat_dim))# [bs, num_edges, 2048]
+            # textual_edge_features[i] = torch.cat(textual_edge_features[i]).cuda(0)
+            # # textual_nodes[i] = TextualNodeModel(extual_node_features[i])
+            # # textual_edges[i] = TextualEdgeModel()
+
             visual_node_features[i], visual_edge_features[i], visual_global_features[i] = self.visual_graph(visual_node_features[i], visual_edge_ends[i], visual_edge_features[i], visual_global_features[i])
             # textual_node_features[i], textual_edge_features[i], textual_global_features[i] = self.textual_graph(textual_node_features[i], textual_edge_ends[i], textual_edge_features[i], textual_global_features[i])
             # visual_node_features, visual_edge_features, visual_global_features = self.visual_graph(visual_node_features, visual_edge_ends, visual_edge_features, visual_global_features)
@@ -407,28 +391,28 @@ class GraphMemoNet(MemoNet):
 
         ## metadata
         bs = len(sample_list.question_id) 
-        num_regions_vg = []
-        for i in range(bs):
-            num_regions_vg.append(len(sample_list.region_description["region_id"][i]))
+        # num_regions_vg = []
+        # for i in range(bs):
+        #     num_regions_vg.append(len(sample_list.region_description["region_id"][i]))
         # print("num_regions_vg", num_regions_vg)
 
         ## question & caption word embedding(word->300D vec)
         # print("text", sample_list.text)  #tensor[4,20]
         sample_list.text = self.word_embedding(sample_list.text)
         # print("text", sample_list.text.size()) # torch.Size([4, 20, 300])
-        for i in range(bs):
-            for j in range (num_regions_vg[i]):
-                # [[50,20],[50,20],[49,20][49,20]]
-                sample_list.region_description["phrase"][i][j] = torch.tensor(sample_list.region_description["phrase"][i][j]).cuda() #torch.Size([20])
-                sample_list.region_description["phrase"][i][j] = self.word_embedding(sample_list.region_description["phrase"][i][j]) #torch.Size([20, 300])
+        # for i in range(bs):
+        #     for j in range (num_regions_vg[i]):
+        #         # [[50,20],[50,20],[49,20][49,20]]
+        #         sample_list.region_description["phrase"][i][j] = torch.tensor(sample_list.region_description["phrase"][i][j]).cuda() #torch.Size([20])
+        #         sample_list.region_description["phrase"][i][j] = self.word_embedding(sample_list.region_description["phrase"][i][j]) #torch.Size([20, 300])
         
         # question & caption GRU embedding
-        text_embedding_total, embedding_phrase_total = self.process_text_embedding(sample_list)
+        text_embedding_total = self.process_text_embedding(sample_list)
         # print("text_embedding", text_embedding_total.size())
 
         # image feat
         image_embedding_total, _ = self.process_feature_embedding(
-            "image", sample_list, text_embedding_total, embedding_phrase_total
+            "image", sample_list, text_embedding_total
         )
         # print("img_embedding", image_embedding_total.size())
        

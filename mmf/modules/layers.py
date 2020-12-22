@@ -867,7 +867,7 @@ class MemNNLayer(nn.Module):
         self.dropout = nn.Dropout(p=dropout, inplace=True)
         self.A = nn.ModuleList([nn.Embedding(vocab_size, embd_size) for _ in range(hops+1)])  #
 
-        print("emb_A", self.A[0], "*", len(self.A)) # (2048, 30) * 4
+        # print("emb_A", self.A[0], "*", len(self.A)) # (2048, 30) * 4
 
         for i in range(len(self.A)):
             self.A[i].weight.data.normal_(0, init_rng)
@@ -1037,9 +1037,6 @@ class GraphLayer(nn.Module):
 
 
     def forward(self, node_features, edge_ends, edge_features, global_features):
-        aa =  node_features
-        bb = edge_features
-        cc = global_features
         num_edges = len(edge_ends) #5554, kilos of edges
         num_nodes = len(node_features)
         # print(num_edges) #5554, kilos of edges
@@ -1090,7 +1087,6 @@ class GraphLayer(nn.Module):
         global_features = gru_hidnew_u.squeeze(0).squeeze(0)
 
         return node_features, edge_features, global_features
-        # return aa, bb, cc
 
 class myGRU(nn.Module):
     def __init__(self, embedding_dim, hidden_dim):
@@ -1108,3 +1104,9 @@ class myGRU(nn.Module):
         out1, self.hidden_out = self.rnn(x,self.hidden)     
         # 
         return out1, self.hidden_out
+
+# class MemoLayer(nn.Module):
+#     def __init__(self, H, W):
+#             # H*W 
+#     def is_located_on(self, bbox, grid): # to judge if a bbox locates on a grid
+#         pass
