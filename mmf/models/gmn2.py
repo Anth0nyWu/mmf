@@ -317,30 +317,21 @@ class GraphMemoNet2(Pythia):
 
 
     def forward(self, sample_list):
-        # self.print_sample_list(sample_list)
+        self.print_sample_list(sample_list)
 
         ## metadata
         bs = len(sample_list.question_id) 
-        # num_regions_vg = []
-        # for i in range(bs):
-        #     num_regions_vg.append(len(sample_list.region_description["region_id"][i]))
-        # print("num_regions_vg", num_regions_vg)
 
         ## question & caption word embedding(word->300D vec)
         # print("text", sample_list.text)  #tensor[4,20]
         sample_list.text = self.word_embedding(sample_list.text)
         # print("text", sample_list.text.size()) # torch.Size([4, 20, 300])
-        # for i in range(bs):
-        #     for j in range (num_regions_vg[i]):
-        #         # [[50,20],[50,20],[49,20][49,20]]
-        #         sample_list.region_description["phrase"][i][j] = torch.tensor(sample_list.region_description["phrase"][i][j]).cuda() #torch.Size([20])
-        #         sample_list.region_description["phrase"][i][j] = self.word_embedding(sample_list.region_description["phrase"][i][j]) #torch.Size([20, 300])
         
         # question & caption GRU embedding
         text_embedding_total = self.process_text_embedding(sample_list)
         # print("text_embedding", text_embedding_total.size())
 
-        # image feat
+        # image feature embedding with MCB+graph
         image_embedding_total, _ = self.process_feature_embedding(
             "image", sample_list, text_embedding_total
         )
