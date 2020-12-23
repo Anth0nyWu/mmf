@@ -320,7 +320,7 @@ class GraphMemoNet2(Pythia):
         # self.print_sample_list(sample_list)
 
         ## metadata
-        # bs = len(sample_list.question_id) 
+        bs = len(sample_list.question_id) 
         # num_regions_vg = []
         # for i in range(bs):
         #     num_regions_vg.append(len(sample_list.region_description["region_id"][i]))
