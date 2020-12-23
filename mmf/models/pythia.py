@@ -202,7 +202,7 @@ class Pythia(BaseModel):
         self, sample_list, embedding_attr="text_embeddings", info=None
     ):
 
-        print("=====text embedding=====")
+        # print("=====text embedding=====")
 
         text_embeddings = []
 
@@ -239,7 +239,7 @@ class Pythia(BaseModel):
             text_embeddings.append(embedding)
 
         text_embeddding_total = torch.cat(text_embeddings, dim=1)
-        print("text_embedding_tot: ", text_embeddding_total.size()) # torch.Size([4(bs), 2048])
+        # print("text_embedding_tot: ", text_embeddding_total.size()) # torch.Size([4(bs), 2048])
 
         return text_embeddding_total
 

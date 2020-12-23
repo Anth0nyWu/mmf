@@ -72,67 +72,6 @@ class GraphMemoNet2(Pythia):
 
     # def _init_memo_layer(self, H, W): 
     #     self.memo_layer = MemoLayer()
-
-    """
-    def process_text_embedding(
-        self, sample_list, embedding_attr="text_embeddings", info=None
-    ):
-        # print("=====text embedding=====")
-
-        #metadata
-        bs = len(sample_list.question_id) 
-        num_regions_vg = []
-        for i in range(bs):
-            num_regions_vg.append(len(sample_list.region_description["region_id"][i]))
-        
-        text_embeddings = []
-        embedding_phrase = [[] for i in range (bs)]
-        embedding_phrases = []
-        # Get "text" attribute in case of "text_embeddings" case
-        # and "context" attribute in case of "context_embeddings"
-        texts = getattr(sample_list, embedding_attr.split("_")[0])
-        phrases = sample_list.region_description["phrase"]
-        # print("text", texts.size())  # bs*20*300
-        # print("phrases", phrases)
-
-        # Get embedding models
-        text_embedding_models = getattr(self, embedding_attr)
-        for text_embedding_model in text_embedding_models:
-            # print("text_model", text_embedding_model)
-            '''
-            text_model TextEmbedding(
-                (module): BiLSTM(
-                    ...
-                )
-            )
-            '''
-            # TODO: Move this logic inside
-            if isinstance(text_embedding_model, PreExtractedEmbedding):
-                embedding = text_embedding_model(sample_list.question_id)
-            else:
-                embedding = text_embedding_model(texts)
-            # print("text_embedding: ", embedding.size()) 
-            # torch.Size([4(bs), 2048attn/1280gnu])
-                for i in range(bs):
-                    for j in range (num_regions_vg[i]):
-                        embedding_phrase[i].append(text_embedding_model(phrases[i][j].unsqueeze(0))) 
-                        # print(embedding_phrase[i][j].size()) # torch.Size([1,2048/1280])
-                        #[50,50,49,49*tensors]
-
-            text_embeddings.append(embedding)
-            embedding_phrases.append(embedding_phrase)           
-        
-        # cat different embedding models(only 1 model here)
-        text_embeddding_total = torch.cat(text_embeddings, dim=1)
-        # print("text_embedding_tot: ", text_embeddding_total.size()) # torch.Size([4(bs), 2048])
-        # embedding_phrase_total =  torch.cat(embedding_phrases, dim=0)
-        embedding_phrase_total = embedding_phrases # cannot cat a list, [1,4,50/49*[1,2048]]
-        # print(len(embedding_phrase_total))
-        # print(len(embedding_phrase_total[0]))
-        # print(len(embedding_phrase_total[0][0]))
-
-        return text_embeddding_total, embedding_phrase_total
-    """
         
     def process_feature_embedding(
         self, attr, sample_list, text_embedding_total, extra=None, batch_size_t=None
@@ -148,11 +87,7 @@ class GraphMemoNet2(Pythia):
         # print(batch_size_t)
 
         ## metadata
-        # bs = len(sample_list.question_id) 
         bs = batch_size_t
-        # num_regions_vg = []
-        # for i in range(bs):
-        #     num_regions_vg.append(len(sample_list.region_description["region_id"][i]))
 
         ## Convert list of keys to the actual values
         extra = sample_list.get_fields(extra)
@@ -255,17 +190,12 @@ class GraphMemoNet2(Pythia):
         
         # init graph data
         visual_node_features = [[] for i in range (bs)]
-        textual_node_features = [[] for i in range (bs)]
         visual_edge_ends = [[] for i in range (bs)]
-        textual_edge_ends = [[] for i in range (bs)]
         visual_edge_features = [[] for i in range (bs)]
-        textual_edge_features = [[] for i in range (bs)]
 
         visual_edge_feat_dim = 2048 # 2048
-        textual_edge_feat_dim = 2048 # 2048
 
-        visual_global_features = encoded_feature[1][:,0,:]
-        textual_global_features = text_embedding_total
+        visual_global_features = encoded_feature[1][:,0,:] #?? last layer of resnet 101
 
         ## visual graph init
         for i in range(bs):
@@ -390,7 +320,7 @@ class GraphMemoNet2(Pythia):
         # self.print_sample_list(sample_list)
 
         ## metadata
-        bs = len(sample_list.question_id) 
+        # bs = len(sample_list.question_id) 
         # num_regions_vg = []
         # for i in range(bs):
         #     num_regions_vg.append(len(sample_list.region_description["region_id"][i]))
