@@ -6,6 +6,7 @@ dataset_config:
     return_features_info: true
     return_region_descriptions: false
     no_unk: true
+    max_features : 20
 
 optimizer:
   type: Adamax
@@ -29,12 +30,12 @@ training:
   # - 20000
   # - 21000
   max_grad_l2_norm: 0.25
-  max_updates: 22000
+  max_updates: 72000
   use_warmup: true
   warmup_factor: 0.2
   warmup_iterations: 3000
-  batch_size: 1 # 512
-  num_workers: 0 # 7
+  batch_size: 6 # 512
+  num_workers: 1 # 7
   task_size_proportional_sampling: true
   early_stop:
     criteria: visual_genome/vqa_accuracy

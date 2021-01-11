@@ -30,6 +30,7 @@ class FeaturesDatabase(ImageDatabase):
                 base_path=get_absolute_path(image_feature_dir),
                 depth_first=config.get("depth_first", False),
                 max_features=config.get("max_features", 100),
+                return_features_info=config.get("return_features_info", False),
             )
             self.feature_readers.append(feature_reader)
 

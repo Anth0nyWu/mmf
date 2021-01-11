@@ -34,6 +34,7 @@ class VisualGenomeDataset(VQA2Dataset):
         self.scene_graph_db = None
         self.region_descriptions_db = None
         self.image_metadata_db = None
+        self._max_feature = config.max_features
 
         build_scene_graph_db = (
             self._return_scene_graph
@@ -96,10 +97,12 @@ class VisualGenomeDataset(VQA2Dataset):
             return self.load_item((idx + 1) % len(self.annotation_db))
 
         current_sample = super().load_item(idx) # convert question to encoded vector here
-        # print("current sample", current_sample)
         current_sample = self._load_scene_graph(idx, current_sample)
         current_sample = self._load_region_description(idx, current_sample) # also include text processor for region descriptions
 
+        # cut short features to max feat
+        # current_sample.max_features = self._max_feature
+        
         # print("region current sample", current_sample)
         return current_sample
 
@@ -109,7 +112,7 @@ class VisualGenomeDataset(VQA2Dataset):
     def _get_image_info(self, idx):
         # Deep copy so that we can directly update the nested dicts
         # return copy.deepcopy(self.scene_graph_db[self._get_image_id(idx)])
-        img_id =  self._get_image_id(idx)
+        img_id = self._get_image_id(idx)
         # print("img id", self._get_image_id(idx))
 
         image_info = copy.deepcopy(self.region_descriptions_db[self._get_image_id(idx)])

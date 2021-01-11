@@ -234,7 +234,7 @@ class Pythia(BaseModel):
             else:
                 embedding = text_embedding_model(texts)
 
-            print("text_embedding: ", embedding.size()) 
+            # print("text_embedding: ", embedding.size()) 
             # torch.Size([4(bs), 2048])
             text_embeddings.append(embedding)
 

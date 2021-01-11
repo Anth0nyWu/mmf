@@ -24,6 +24,7 @@ class VQA2Dataset(MMFDataset):
         self._should_fast_read = self.config.get("fast_read", False)
         self.use_ocr = self.config.use_ocr
         self.use_ocr_info = self.config.use_ocr_info
+        self.max_features = self.config.max_features
 
     def init_processors(self):
         super().init_processors()
@@ -89,6 +90,11 @@ class VQA2Dataset(MMFDataset):
 
         if self._use_features:
             features = self.features_db[idx]
+            if self.max_features:
+                features["image_info_0"]["num_boxes"] = self.max_features           
+                features["image_info_0"]["max_features"] = self.max_features
+                features["image_info_0"]["bbox"] = features["image_info_0"]["bbox"][0:self.max_features, :]
+                features["image_feature_0"] = features["image_feature_0"][0:self.max_features, :]
             if hasattr(self, "transformer_bbox_processor"):
                 features["image_info_0"] = self.transformer_bbox_processor(
                     features["image_info_0"]

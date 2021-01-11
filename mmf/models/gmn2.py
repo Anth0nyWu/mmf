@@ -88,7 +88,6 @@ class GraphMemoNet2(Pythia):
 
         ## metadata
         bs = batch_size_t
-
         ## Convert list of keys to the actual values
         extra = sample_list.get_fields(extra)
         ## bboxes
@@ -168,7 +167,7 @@ class GraphMemoNet2(Pythia):
             feature_dim = getattr(feature_info, "max_features", None)
             if feature_dim is not None:
                 feature_dim = feature_dim[:batch_size_t]
-            # print("feat_dim", feature_dim)  # none
+            # print("max_feat_dim_in_gmn2_processor", feature_dim)  # [batch, max_feat], none
 
             # Attribute in which encoders are saved, for "image" it
             # will be "image_feature_encoders", other example is
@@ -238,8 +237,8 @@ class GraphMemoNet2(Pythia):
 
         # print("len vis node feat", len(visual_node_features)) #[4*[100, 2048]]
         # print("vis node feat[0]", visual_node_features[1].size())
-        a = torch.cat(visual_node_features, dim = 0).reshape(len(visual_node_features),100,2048)
-        encoded_feature[0] = a
+        if feature_dim is not None:
+            encoded_feature[0] = torch.cat(visual_node_features, dim = 0).reshape(len(visual_node_features),feature_dim,2048)
         # print(encoded_feature[0].size())
 
         for i, feature in enumerate(features):
@@ -317,7 +316,7 @@ class GraphMemoNet2(Pythia):
 
 
     def forward(self, sample_list):
-        self.print_sample_list(sample_list)
+        # self.print_sample_list(sample_list)
 
         ## metadata
         bs = len(sample_list.question_id) 

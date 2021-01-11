@@ -1039,7 +1039,7 @@ class GraphLayer(nn.Module):
     def forward(self, node_features, edge_ends, edge_features, global_features):
         num_edges = len(edge_ends) #5554, kilos of edges
         num_nodes = len(node_features)
-        # print(num_edges) #5554, kilos of edges
+        # print(num_edges, num_nodes) #5554, kilos of edges -> 1k
         # print(len(edge_ends[0]))  # 2, 2 nodes
         # print(type(node_features), type(edge_features), type(global_features))
         # print(len(node_features), len(edge_features), len(global_features)) # 100 5554 196

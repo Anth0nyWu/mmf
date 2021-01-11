@@ -25,7 +25,7 @@ def load_feat(feat_path: str, convert_to_tensor: bool = False) -> Any:
 
 
 class FeatureReader:
-    def __init__(self, base_path, depth_first, max_features=None):
+    def __init__(self, base_path, depth_first, max_features=None, return_features_info=False):
         """Feature Reader class for reading features.
 
         Note: Deprecation: ndim and image_feature will be deprecated later
@@ -52,22 +52,28 @@ class FeatureReader:
         self.depth_first = depth_first
         self.max_features = max_features
         self.ndim = ndim
+        self.return_features_info = return_features_info
 
     def _init_reader(self):
         # Currently all lmdb features are with ndim == 2
         if self.base_path.endswith(".lmdb"):
             self.feat_reader = LMDBFeatureReader(self.max_features, self.base_path)
         elif self.ndim == 2 or self.ndim == 0:
+            print("max_features", self.max_features)
             if self.max_features is None:
                 self.feat_reader = FasterRCNNFeatureReader()
             else:
                 # TODO: Fix later when we move to proper standardized features
                 # if isinstance(self.image_feature.item(0), dict):
+                # if (self.return_features_info):
+                #     print("there")
                 #     self.feat_reader = \
                 #         PaddedFeatureRCNNWithBBoxesFeatureReader(
                 #             self.max_features
                 #         )
                 # else:
+                #     print("here")
+                #     self.feat_reader = PaddedFasterRCNNFeatureReader(self.max_features)
                 self.feat_reader = PaddedFasterRCNNFeatureReader(self.max_features)
         elif self.ndim == 3 and not self.depth_first:
             self.feat_reader = Dim3FeatureReader()
